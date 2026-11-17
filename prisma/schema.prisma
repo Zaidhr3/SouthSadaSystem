@@ -1196,3 +1196,116 @@ model MediaAsset {
 
   @@index([category])
 }
+
+/// مساعد النظام الذكي: محادثات الإدارة (كل رسالة مع سجل الأدوات التي استخدمها)
+model AssistantThread {
+  id        Int                @id @default(autoincrement())
+  userId    Int
+  title     String
+  messages  AssistantMessage[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model AssistantMessage {
+  id        Int             @id @default(autoincrement())
+  threadId  Int
+  thread    AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  /// user | assistant
+  role      String
+  text      String
+  /// الأدوات المستخدمة: [{name, args, ms, ok}]
+  tools     Json?
+  model     String?
+  createdAt DateTime        @default(now())
+
+  @@index([threadId, id])
+}
+
+/// سجل مشاكل النظام: يكتبه المساعد الذكي (فحص/تحليل) أو المستخدم — للمتابعة حتى الحل
+model SystemIssue {
+  id          Int       @id @default(autoincrement())
+  title       String
+  detail      String
+  /// LOW | MEDIUM | HIGH | CRITICAL
+  severity    String    @default("MEDIUM")
+  /// المجال: مالية، عطاءات، تسويق، بيانات، أمان، أداء...
+  area        String?
+  /// OPEN | RESOLVED | DISMISSED
+  status      String    @default("OPEN")
+  /// AI | USER | CRON
+  source      String    @default("AI")
+  suggestion  String?
+  createdById Int?
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  @@index([status, severity])
+}
+
+/// مكتبة المهارات: تعليمات قابلة لإعادة الاستخدام (SKILL.md) مستوردة من GitHub أو مكتوبة يدوياً — يستخدمها المساعد والتسويق
+model AiSkill {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String
+  content     String
+  /// رابط المصدر (GitHub) أو null للمكتوبة يدوياً
+  sourceUrl   String?
+  /// assistant | marketing | both
+  scope       String   @default("both")
+  enabled     Boolean  @default(true)
+  createdById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// مركز الحسابات: لقطة منشورات فيسبوك وإنستغرام مع الأداء وحكم المحلل الذكي (إبقاء/إخفاء/حذف/تمويل)
+model SocialPost {
+  /// معرّف المنشور على Meta
+  id          String    @id
+  /// FB | IG
+  platform    String
+  /// IMAGE | VIDEO | REEL | CAROUSEL | TEXT
+  mediaType   String?
+  text        String?
+  picture     String?
+  permalink   String?
+  postedAt    DateTime
+  /// {reach, views, likes, comments, shares, saves, engagement}
+  metrics     Json?
+  /// KEEP | IMPROVE | HIDE | DELETE | BOOST
+  verdict     String?
+  reason      String?
+  /// 0–100: جدارة التمويل الإعلاني
+  boostScore  Int?
+  /// قرار الإدارة بعد الحكم: DONE | IGNORED
+  decision    String?
+  analyzedAt  DateTime?
+  fetchedAt   DateTime  @default(now())
+  /// اختفى من الحساب (حُذف/أُرشف)
+  gone        Boolean   @default(false)
+
+  @@index([platform, postedAt])
+}
+
+/// حملات التمويل الإعلاني (Meta Marketing API) — لا تُنشأ إلا بموافقة الإدارة وضمن سقف الميزانية
+model AdBoost {
+  id          Int       @id @default(autoincrement())
+  postId      String
+  platform    String
+  dailyBudget Float
+  days        Int
+  /// تقدير ودليل المحلل قبل التمويل
+  analysis    String?
+  /// DRAFT | ACTIVE | PAUSED | DONE | FAILED
+  status      String    @default("DRAFT")
+  campaignId  String?
+  adSetId     String?
+  adId        String?
+  log         String?
+  createdById Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}

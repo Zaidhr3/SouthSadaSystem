@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { requestContext } from "./context";
 
 const WRITE_OPS = new Set(["create", "createMany", "update", "updateMany", "upsert", "delete", "deleteMany"]);
-const SKIP_MODELS = new Set(["AuditLog", "NotificationDismissal", "NotificationEvent", "EmailLog", "AttachmentBlob", "ClaimEvent", "AiExtraction", "UploadTicket", "IntegrationSecret"]);
+const SKIP_MODELS = new Set(["AuditLog", "NotificationDismissal", "NotificationEvent", "EmailLog", "AttachmentBlob", "ClaimEvent", "AiExtraction", "UploadTicket", "IntegrationSecret", "AssistantThread", "AssistantMessage"]);
 const SECRET_KEYS = new Set(["passwordHash", "password"]);
 const MAX_JSON = 200_000;
 

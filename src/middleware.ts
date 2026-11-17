@@ -36,7 +36,8 @@ export async function middleware(req: NextRequest) {
     return res;
   }
   const previewing = !!bypass && bypass.length >= 16 && req.cookies.get(PREVIEW_COOKIE)?.value === bypass;
-  if (process.env.MAINTENANCE_MODE === "1" && !previewing) {
+  // طلبات عروض الأسعار من موقع الشركة تبقى مفتوحة حتى أثناء الصيانة (لا يضيع أي عميل)
+  if (process.env.MAINTENANCE_MODE === "1" && !previewing && !pathname.startsWith("/api/public/rfq") && !pathname.startsWith("/api/cron/")) {
     if (pathname.startsWith("/api/")) return NextResponse.json({ error: "maintenance", message: "النظام تحت الصيانة — حاول بعد قليل" }, { status: 503, headers: { "Retry-After": "600" } });
     if (pathname !== "/sw.js" && pathname !== "/manifest.webmanifest") {
       return new NextResponse(MAINTENANCE_HTML, { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Retry-After": "600", "Cache-Control": "no-store" } });
