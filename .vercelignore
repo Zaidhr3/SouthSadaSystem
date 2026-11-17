@@ -1,0 +1,16 @@
+# أسرار وبيانات محلية — لا تُرفع إلى Vercel أبداً
+.env
+.env.*
+!.env.example
+prisma/*.db
+prisma/*.db-journal
+storage/
+backups/
+node_modules/
+.next/
+.next-test/
+screenshots/
+*.log
+cloudflared
+*.exe
+tsconfig.tsbuildinfo

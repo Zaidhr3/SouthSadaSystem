@@ -1,0 +1,71 @@
+{
+  "name": "south-sada-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "نظام إدارة شركة صدى الجنوب للمقاولات الإنشائية - نظام محلي متكامل",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "node scripts/sync-db-provider.mjs && prisma generate && next build",
+    "start": "next start -p 3000 -H 0.0.0.0",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:push": "node scripts/sync-db-provider.mjs && prisma db push && tsx scripts/enable-rls.ts",
+    "db:seed": "node scripts/sync-db-provider.mjs && prisma db seed",
+    "db:reset": "node scripts/sync-db-provider.mjs && prisma db push --force-reset && prisma db seed",
+    "setup": "node scripts/sync-db-provider.mjs && prisma db push && tsx scripts/enable-rls.ts && prisma db seed",
+    "db:demo": "tsx prisma/demo-seed.ts",
+    "db:sync": "node scripts/sync-db-provider.mjs && prisma generate",
+    "predev": "node scripts/sync-db-provider.mjs && prisma generate",
+    "cloud:migrate": "node scripts/sync-db-provider.mjs && prisma generate && prisma db push --skip-generate && tsx scripts/migrate-to-supabase.ts",
+    "db:rls": "tsx scripts/enable-rls.ts",
+    "db:check": "tsx scripts/check-integrity.ts",
+    "storage:setup": "tsx scripts/setup-storage.ts",
+    "letter:template": "node scripts/embed-letter-template.mjs",
+    "files:import": "tsx scripts/import-legacy-files.ts",
+    "db:backup": "node scripts/sync-db-provider.mjs && prisma generate && tsx scripts/backup-cloud.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.9.0",
+    "@fontsource/cairo": "^5.1.0",
+    "@prisma/client": "^5.22.0",
+    "@sparticuz/chromium": "^153.0.0",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
+    "jose": "^5.9.6",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.460.0",
+    "next": "^14.2.18",
+    "nodemailer": "^6.9.16",
+    "pdf-lib": "^1.17.1",
+    "puppeteer-core": "^25.17.0",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.13.3",
+    "server-only": "^0.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.9.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.18",
+    "postcss": "^8.4.49",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.15",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}

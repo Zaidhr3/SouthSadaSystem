@@ -1,0 +1,1198 @@
+// نظام إدارة شركة صدى الجنوب للمقاولات الإنشائية
+// قاعدة بيانات SQLite محلية. القيم المالية بالدينار الأردني (3 منازل عشرية).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// role: ADMIN | ACCOUNTANT | PM | CHAIRMAN (المشرف الأعلى — اطلاع فقط) | AUDITOR (مراقب ومدقق — اطلاع فقط)
+model User {
+  id            Int       @id @default(autoincrement())
+  username      String    @unique
+  name          String
+  title         String?
+  phone         String?
+  role          String
+  passwordHash  String
+  email         String?
+  notifyEmail   Boolean   @default(true)
+  active        Boolean   @default(true)
+  /// سبب الإيقاف — يظهر للمستخدم عند محاولة الدخول
+  suspendReason String?
+  /// تعميم إلزامي من المدير العام يظهر عند الدخول حتى يؤكد المستخدم اطلاعه
+  notice        String?
+  noticeSetAt   DateTime?
+  noticeAckAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  events           NotificationEvent[]
+  messagesSent     Message[]           @relation("MessageSender")
+  messagesReceived Message[]           @relation("MessageRecipient")
+
+  managedTenders       Tender[]                @relation("TenderManager")
+  expenses             Expense[]               @relation("ExpenseCreator")
+  fundRequestsMade     FundRequest[]           @relation("FundRequester")
+  fundRequestsReceived FundRequest[]           @relation("FundRecipient")
+  fundRequestsDecided  FundRequest[]           @relation("FundDecider")
+  attachments          Attachment[]
+  dismissals           NotificationDismissal[]
+}
+
+/// العطاء / المشروع: العطاء المحال يصبح مشروعاً قيد التنفيذ
+/// status: PURCHASED | PRICING | SUBMITTED | NEGOTIATION | WON | LOST | EXECUTION | MAINTENANCE | CLOSED | CANCELLED
+model Tender {
+  id                      Int       @id @default(autoincrement())
+  name                    String
+  number                  String
+  entity                  String
+  location                String?
+  classification          String?
+  status                  String    @default("PURCHASED")
+  purchaseDate            DateTime
+  docFee                  Float     @default(0)
+  deadline                DateTime
+  siteVisitDate           DateTime?
+  siteVisitNotes          String?
+  bidAmount               Float?
+  negotiationDiscount     Float?
+  awardedValue            Float?
+  resultDate              DateTime?
+  stampFee                Float?
+  stampFeeDate            DateTime?
+  awardLetterNo           String?
+  awardLetterDate         DateTime?
+  commenceOrderDate       DateTime?
+  durationDays            Int?
+  progress                Int       @default(0)
+  /// اعتماد جدول الكميات التعاقدي (المحاسب) — يقفل الأسعار والكميات الأصلية
+  boqApprovedAt           DateTime?
+  boqApprovedById         Int?
+  advancePayment          Float     @default(0)
+  advanceDate             DateTime?
+  variationTotal          Float     @default(0)
+  variationDays           Int       @default(0)
+  retentionReleasedAmount Float?
+  retentionReleasedDate   DateTime?
+  preliminaryHandoverDate DateTime?
+  finalHandoverDate       DateTime?
+  // ── المرحلة الثالثة: لجنة الاستلام الابتدائي ──
+  prelimInspectionDate    DateTime?
+  prelimCommittee         String?
+  prelimSnags             String?
+  prelimSnagsClearedDate  DateTime?
+  /// مدة الصيانة (عيوب المصنعية) بالأشهر: 12 أو 24 حسب العقد
+  maintenanceMonths       Int?
+  // ── المرحلة الخامسة: لجنة الاستلام النهائي والإغلاق ──
+  finalInspectionDate     DateTime?
+  finalCommittee          String?
+  finalNotes              String?
+  maintenanceReleaseDate  DateTime?
+  closedAt                DateTime?
+  /// نوع العطاء: GOV حكومي | PRIVATE مشروع خاص (مالك أو شركة)
+  kind                    String    @default("GOV")
+  /// الأرشفة: 0 نشط، 1 أرشيف فترة الصيانة، 2 أرشيف نهائي مقفل (لا يُعاد إلا من المدير العام)
+  archiveStage            Int       @default(0)
+  archivedAt              DateTime?
+  finalArchivedAt         DateTime?
+  archiveNote             String?
+  /// المرحلة التعاقدية المحددة يدوياً من الإدارة (1–5) — لإدخال المشاريع القديمة في أي مرحلة.
+  /// المرحلة المعروضة = الأعلى بين هذه القيمة والمرحلة المستنتجة من البيانات المسجلة.
+  phase                   Int?
+  /// المهندس المشرف (من صاحب العمل)
+  supervisorName          String?
+  supervisorPhone         String?
+  /// الرقم الضريبي لصاحب العمل وهاتفه (للفاتورة الإلكترونية — جفوتارا)
+  employerTin             String?
+  employerPhone           String?
+  notes                   String?
+  managerId               Int?
+  manager                 User?     @relation("TenderManager", fields: [managerId], references: [id], onDelete: SetNull)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  boqItems         BoqItem[]
+  guarantees       Guarantee[]
+  claims           Claim[]
+  expenses         Expense[]
+  cheques          Cheque[]
+  fundRequests     FundRequest[]
+  bankTransactions BankTransaction[]
+  loans            Loan[]
+  variations       VariationOrder[]
+  subcontracts     Subcontract[]
+  materials        MaterialReceipt[]
+  equipmentLogs    EquipmentLog[]
+  correspondence   Correspondence[]
+  surveys          Survey[]
+  diaries          SiteDiary[]
+  fieldRequests    FieldRequest[]
+  clientAccesses   ClientAccess[]
+  workPlan         WorkPlanItem[]
+  portalMessages   PortalMessage[]
+  signRequests     SignRequest[]
+
+  @@index([status])
+  @@index([managerId])
+  @@index([deadline])
+  @@index([archiveStage])
+}
+
+/// بند جدول الكميات - كل بند مُسعّر يُفهرس تلقائياً في مكتبة الأسعار التاريخية
+model BoqItem {
+  id          Int       @id @default(autoincrement())
+  tenderId    Int
+  tender      Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  itemNo      String?
+  description String
+  normalized  String
+  category    String
+  unit        String
+  quantity    Float
+  unitPrice   Float
+  costPrice   Float?
+  supplier    String?
+  specs       String?
+  sortOrder   Int       @default(0)
+  /// مستخرج آلياً (AI) — رقم الصفحة والمرجع في المستند والقيم الأصلية كما قرأها النموذج
+  source      String?
+  sourcePage  Int?
+  sourceRef   String?
+  aiOriginal  String?
+  /// آخر تعديل يدوي على بند مستخرج (يظهر شارة للمحاسب والإدارة)
+  editedById  Int?
+  editedAt    DateTime?
+  editNote    String?
+  createdAt   DateTime  @default(now())
+
+  @@index([normalized])
+  @@index([category])
+  @@index([tenderId])
+}
+
+/// type: BID | PERFORMANCE | MAINTENANCE
+/// form: BANK_GUARANTEE | CERTIFIED_CHEQUE
+/// status: ISSUED | SUBMITTED | RETRIEVED | RETURNED
+model Guarantee {
+  id            Int       @id @default(autoincrement())
+  tenderId      Int
+  tender        Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  type          String
+  form          String
+  bank          String
+  referenceNo   String?
+  amount        Float
+  bankFee       Float     @default(0)
+  issueDate     DateTime
+  expiryDate    DateTime?
+  submittedDate DateTime?
+  depositBox    String?
+  status        String    @default("ISSUED")
+  retrievedDate DateTime?
+  returnedDate  DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  @@index([status])
+  @@index([expiryDate])
+}
+
+/// type: INTERIM | FINAL
+/// status: DRAFT (قيد الإعداد) | REVIEW (مقدمة للتدقيق) | SUBMITTED (معتمدة ومقفلة — مقدمة للجهة) | APPROVED (معتمدة من الجهة) | PAID (مسددة) | REJECTED
+model Claim {
+  id                    Int          @id @default(autoincrement())
+  tenderId              Int
+  tender                Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  type                  String
+  number                Int
+  submittedDate         DateTime
+  grossAmount           Float
+  retention             Float        @default(0)
+  withholdingTax        Float        @default(0)
+  stampDuty             Float        @default(0)
+  advanceRecovery       Float        @default(0)
+  deductions            Float        @default(0)
+  /// النسب المطبقة على هذه المطالبة (للطباعة والتدقيق)
+  retentionRate         Float?
+  taxRate               Float?
+  stampRate             Float?
+  /// معد المطالبة، ومعتمدها، ووقت القفل بعد اعتماد المدير العام
+  preparedById          Int?
+  approvedById          Int?
+  lockedAt              DateTime?
+  /// بوابة البريد: تأكيد تدقيق المحاسب وإرسال إشعار الجاهزية
+  auditedById           Int?
+  readyAt               DateTime?
+  deductionNotes        String?
+  /// نسبة الحسم من قيمة أعمال المطالبة (%) — عند تحديدها يُحتسب مبلغ الحسم تلقائياً
+  deductionRate         Float?
+  status                String       @default("SUBMITTED")
+  approvedDate          DateTime?
+  paidDate              DateTime?
+  paidAmount            Float?
+  notes                 String?
+  /// آخر سبب رفض/إرجاع (من الإدارة أو المحاسب) — يظهر لمدير المشروع لتعديل المطالبة وإعادة تقديمها
+  returnReason          String?
+  returnedAt            DateTime?
+  /// متابعة إجراءات الصرف بعد موافقة الإدارة: DELIVERED | ENGINEER | FINANCE | CHEQUE | BLOCKED
+  disbursementStage     String?
+  disbursementNote      String?
+  disbursementUpdatedAt DateTime?
+  /// دورة القبض: RECEIVED (رُفعت صورة الشيك — بانتظار المحاسب) · AUDITED (دققها المحاسب — بانتظار الإدارة)
+  payStage              String?
+  receiptAmount         Float?
+  receiptDate           DateTime?
+  receiptRef            String?
+  receiptMethod         String?
+  receiptById           Int?
+  receiptAt             DateTime?
+  receiptAuditedById    Int?
+  receiptAuditedAt      DateTime?
+  receiptNote           String?
+  /// نُقلت للأرشيف بعد القبض والإيداع
+  archivedAt            DateTime?
+  /// الفاتورة الإلكترونية (نظام الفوترة الوطني — جفوتارا)
+  invoiceNo             Int?
+  einvStatus            String?
+  einvUuid              String?
+  einvNumber            String?
+  einvQr                String?
+  einvSigned            String?
+  einvTax               Float?
+  einvTotal             Float?
+  einvError             String?
+  einvSubmittedAt       DateTime?
+  /// نوع الفاتورة الذي اختاره المحاسب عند التدقيق: TAX = ضريبية (جفوتارا) + عادية، REGULAR = عادية فقط (مع السبب)
+  invoiceMode           String       @default("TAX")
+  invoiceModeReason     String?
+  /// تعديل الإدارة على الفاتورة (JSON: البنود، الخصم، بيانات المشتري، ملاحظة) — يُقفل بعد اعتمادها من جفوتارا
+  invoiceOverride       String?
+  invoiceEditedById     Int?
+  invoiceEditedAt       DateTime?
+  createdAt             DateTime     @default(now())
+  lines                 ClaimLine[]
+  events                ClaimEvent[]
+
+  @@index([status])
+}
+
+/// سجل دورة المطالبة: الإرسال، التدقيق، الموافقة/الرفض (مع السبب)، إعادة التقديم، مراحل الصرف، القبض
+model ClaimEvent {
+  id        Int      @id @default(autoincrement())
+  claimId   Int
+  claim     Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  action    String
+  note      String?
+  userId    Int?
+  userName  String?
+  userRole  String?
+  createdAt DateTime @default(now())
+
+  @@index([claimId])
+}
+
+/// paymentMethod: CUSTODY (من عهدة مدير المشروع) | COMPANY (حساب الشركة) | CHEQUE
+model Expense {
+  id            Int        @id @default(autoincrement())
+  tenderId      Int?
+  tender        Tender?    @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  category      String
+  amount        Float
+  date          DateTime
+  description   String
+  vendor        String?
+  paymentMethod String     @default("CUSTODY")
+  chequeId      Int?
+  equipmentId   Int?
+  equipment     Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  fuelLiters    Float?
+  autoSource    String?
+  /// OLD_NO_ATTACHMENT: فاتورة بتاريخ قديم بدون مرفق — للتحقيق (تختفي عند إرفاق الصورة)
+  invoiceFlag   String?
+  createdById   Int
+  createdBy     User       @relation("ExpenseCreator", fields: [createdById], references: [id])
+  createdAt     DateTime   @default(now())
+
+  @@index([tenderId])
+  @@index([date])
+  @@index([createdById])
+}
+
+/// status: DEFERRED | CASHED | CANCELLED | RETURNED
+model Cheque {
+  id         Int       @id @default(autoincrement())
+  number     String
+  bank       String
+  payee      String
+  amount     Float
+  issueDate  DateTime
+  dueDate    DateTime
+  status     String    @default("DEFERRED")
+  cashedDate DateTime?
+  tenderId   Int?
+  tender     Tender?   @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  notes      String?
+  createdAt  DateTime  @default(now())
+
+  @@index([status, dueDate])
+}
+
+/// الديون الخارجية على الشركة (قروض بنكية، تسهيلات، ديون أفراد وشركات وشركاء وموردين)
+/// lenderType: BANK | PERSON | COMPANY | PARTNER | SUPPLIER | OTHER
+/// receivedVia: BANK (إيداع في حساب الشركة) | CASH (نقداً) | DIRECT (دُفع مباشرة لمورد/جهة نيابة عن الشركة)
+/// interestType: NONE | PERCENT (نسبة سنوية بسيطة) | FIXED (مبلغ مقطوع) · status: ACTIVE | SETTLED
+model Loan {
+  id               Int               @id @default(autoincrement())
+  reference        String?
+  lender           String
+  lenderType       String            @default("BANK")
+  lenderContact    String?
+  purpose          String
+  principal        Float
+  interestType     String            @default("NONE")
+  interestRate     Float?
+  interestAmount   Float             @default(0)
+  fees             Float             @default(0)
+  totalDue         Float
+  receivedDate     DateTime
+  receivedVia      String            @default("BANK")
+  frequency        String            @default("MONTHLY")
+  installmentCount Int               @default(1)
+  firstDueDate     DateTime
+  collateral       String?
+  tenderId         Int?
+  tender           Tender?           @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  status           String            @default("ACTIVE")
+  settledAt        DateTime?
+  notes            String?
+  createdById      Int
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  installments     LoanInstallment[]
+  payments         LoanPayment[]
+
+  @@index([status])
+}
+
+/// جدول أقساط الدين — paidAmount يُعاد احتسابه من الدفعات (الأقدم استحقاقاً أولاً)
+model LoanInstallment {
+  id         Int       @id @default(autoincrement())
+  loanId     Int
+  loan       Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  seq        Int
+  dueDate    DateTime
+  amount     Float
+  paidAmount Float     @default(0)
+  paidDate   DateTime?
+
+  @@index([loanId, seq])
+  @@index([dueDate])
+}
+
+/// دفعات سداد الدين · method: BANK (من حساب الشركة) | CASH (نقداً) | CHEQUE (شيك مصروف)
+model LoanPayment {
+  id          Int      @id @default(autoincrement())
+  loanId      Int
+  loan        Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  date        DateTime
+  amount      Float
+  method      String   @default("BANK")
+  reference   String?
+  notes       String?
+  createdById Int
+  createdAt   DateTime @default(now())
+
+  @@index([loanId, date])
+}
+
+/// الحساب البنكي الرئيسي للشركة - يظهر للمدير العام فقط
+/// type: IN | OUT ; sourceType: MANUAL | CLAIM | CHEQUE | EXPENSE | FUND
+model BankTransaction {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  type        String
+  amount      Float
+  description String
+  category    String?
+  tenderId    Int?
+  tender      Tender?  @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  sourceType  String   @default("MANUAL")
+  sourceId    Int?
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+  @@index([sourceType, sourceId])
+}
+
+/// طلبات التمويل والعهد: status PENDING | APPROVED | REJECTED
+model FundRequest {
+  id           Int       @id @default(autoincrement())
+  requesterId  Int
+  requester    User      @relation("FundRequester", fields: [requesterId], references: [id])
+  recipientId  Int
+  recipient    User      @relation("FundRecipient", fields: [recipientId], references: [id])
+  tenderId     Int?
+  tender       Tender?   @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  amount       Float
+  reason       String
+  status       String    @default("PENDING")
+  decidedById  Int?
+  decidedBy    User?     @relation("FundDecider", fields: [decidedById], references: [id])
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime  @default(now())
+
+  @@index([status])
+  @@index([recipientId])
+}
+
+/// أوراق الشركة الرسمية
+model CompanyDocument {
+  id         Int       @id @default(autoincrement())
+  title      String
+  type       String
+  number     String?
+  issuer     String?
+  issueDate  DateTime?
+  expiryDate DateTime?
+  notes      String?
+  createdAt  DateTime  @default(now())
+}
+
+/// مرفقات ومعززات: entityType tender | expense | claim | guarantee | cheque | document
+model Attachment {
+  id           Int             @id @default(autoincrement())
+  entityType   String
+  entityId     Int
+  fileName     String
+  storedName   String          @unique
+  mimeType     String
+  size         Int
+  label        String?
+  /// خانة المستند في دورة حياة المشروع (award_letter, stamp_receipt, commence_order, ...)
+  slot         String?
+  uploadedById Int
+  uploadedBy   User            @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime        @default(now())
+  blob         AttachmentBlob?
+
+  @@index([entityType, entityId])
+}
+
+/// محتوى الملف داخل قاعدة البيانات (يعمل على السحابة بلا قرص دائم) — جدول منفصل حتى لا تُحمّل البيانات الثنائية مع قوائم المرفقات
+model AttachmentBlob {
+  attachmentId Int        @id
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  data         Bytes
+}
+
+model NotificationDismissal {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, key])
+}
+
+/// ═══════════════ الوحدات المؤسسية ═══════════════
+
+/// أمر تغيير / أعمال إضافية: status PENDING | APPROVED | REJECTED
+/// الأوامر المعتمدة تعدّل قيمة العقد (variationTotal) ومدته (variationDays) على العطاء
+model VariationOrder {
+  id           Int       @id @default(autoincrement())
+  tenderId     Int
+  tender       Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  number       Int
+  title        String
+  description  String?
+  amount       Float
+  extraDays    Int       @default(0)
+  clientRef    String?
+  status       String    @default("PENDING")
+  requestDate  DateTime
+  decisionDate DateTime?
+  createdById  Int
+  createdAt    DateTime  @default(now())
+
+  @@index([tenderId])
+}
+
+/// مقاول باطن / مصنعية
+model Subcontractor {
+  id           Int           @id @default(autoincrement())
+  name         String
+  trade        String
+  phone        String?
+  notes        String?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  subcontracts Subcontract[]
+}
+
+/// اتفاقية مقاولة باطن على مشروع: status ACTIVE | COMPLETED | TERMINATED
+model Subcontract {
+  id                    Int                      @id @default(autoincrement())
+  tenderId              Int
+  tender                Tender                   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  subcontractorId       Int
+  subcontractor         Subcontractor            @relation(fields: [subcontractorId], references: [id])
+  scope                 String
+  value                 Float
+  advance               Float                    @default(0)
+  retentionPct          Float                    @default(5)
+  startDate             DateTime
+  endDate               DateTime?
+  status                String                   @default("ACTIVE")
+  retentionReleasedDate DateTime?
+  notes                 String?
+  createdAt             DateTime                 @default(now())
+  certificates          SubcontractCertificate[]
+
+  @@index([tenderId])
+}
+
+/// مستخلص مقاول باطن: kind PROGRESS | RETENTION_RELEASE ; status SUBMITTED | APPROVED | PAID | REJECTED
+model SubcontractCertificate {
+  id              Int         @id @default(autoincrement())
+  subcontractId   Int
+  subcontract     Subcontract @relation(fields: [subcontractId], references: [id], onDelete: Cascade)
+  kind            String      @default("PROGRESS")
+  number          Int
+  date            DateTime
+  workValue       Float
+  advanceRecovery Float       @default(0)
+  retention       Float       @default(0)
+  otherDeductions Float       @default(0)
+  net             Float
+  status          String      @default("SUBMITTED")
+  paidDate        DateTime?
+  notes           String?
+  createdById     Int
+  createdAt       DateTime    @default(now())
+
+  @@index([subcontractId])
+}
+
+/// توريد مواد للموقع (مع صور الإثبات كمرفقات)
+model MaterialReceipt {
+  id           Int      @id @default(autoincrement())
+  tenderId     Int
+  tender       Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  boqItemId    Int?
+  material     String
+  unit         String
+  quantity     Float
+  unitCost     Float?
+  supplier     String?
+  deliveryNote String?
+  date         DateTime
+  notes        String?
+  receivedById Int
+  createdAt    DateTime @default(now())
+
+  @@index([tenderId])
+  @@index([boqItemId])
+}
+
+/// الآليات والمعدات: ownership OWNED | RENTED ; status AVAILABLE | ASSIGNED | MAINTENANCE | RETIRED
+model Equipment {
+  id         Int            @id @default(autoincrement())
+  name       String
+  type       String
+  ownership  String
+  identifier String?
+  dailyRate  Float
+  vendor     String?
+  status     String         @default("AVAILABLE")
+  notes      String?
+  createdAt  DateTime       @default(now())
+  logs       EquipmentLog[]
+  expenses   Expense[]
+}
+
+/// تشغيل معدة على مشروع - تُحمّل كلفتها على المشروع
+model EquipmentLog {
+  id          Int       @id @default(autoincrement())
+  equipmentId Int
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  tenderId    Int
+  tender      Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  startDate   DateTime
+  days        Float
+  dailyRate   Float
+  cost        Float
+  operator    String?
+  notes       String?
+  loggedById  Int
+  createdAt   DateTime  @default(now())
+
+  @@index([tenderId])
+  @@index([equipmentId])
+}
+
+/// الصادر والوارد: direction IN | OUT ؛ ترقيم تلقائي سنوي
+model Correspondence {
+  id                Int              @id @default(autoincrement())
+  direction         String
+  year              Int
+  seq               Int
+  refNo             String           @unique
+  date              DateTime
+  party             String
+  subject           String
+  theirRef          String?
+  tenderId          Int?
+  tender            Tender?          @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  notes             String?
+  /// الكتاب الرسمي الصادر (يُعبأ في ورقة الشركة الرسمية Word): المخاطَب، النص، نسخة إلى
+  recipient         String?
+  body              String?
+  cc                String?
+  /// رد على كتاب وارد سابق
+  replyToId         Int?
+  replyTo           Correspondence?  @relation("CorrReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies           Correspondence[] @relation("CorrReply")
+  /// مسار اعتماد الكتاب الرسمي: PENDING_ACCOUNTANT → PENDING_ADMIN → APPROVED (أو RETURNED للمنشئ). null = تسجيل عادي.
+  /// الرقم الصادر يُعطى عند الاعتماد النهائي فقط؛ المسودة تحمل رقماً مؤقتاً «مسودة-ID» (year=0, seq=-ID).
+  letterStatus      String?
+  letterAttachments String?
+  reviewNote        String?
+  accountantById    Int?
+  accountantAt      DateTime?
+  approvedById      Int?
+  approvedAt        DateTime?
+  createdById       Int
+  createdAt         DateTime         @default(now())
+
+  @@unique([direction, year, seq])
+  @@index([replyToId])
+  @@index([letterStatus])
+}
+
+/// سجل الرقابة والتدقيق (يُكتب تلقائياً لكل عملية إنشاء/تعديل/حذف)
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  userName  String?
+  userRole  String?
+  action    String
+  model     String
+  recordId  Int?
+  summary   String
+  /// الحالة قبل العملية وبعدها (JSON كامل)
+  before    String?
+  after     String?
+  /// سياق الطلب: عنوان IP والمتصفح/الجهاز ومعرّف الطلب (يجمع عمليات الإجراء الواحد)
+  ip        String?
+  userAgent String?
+  requestId String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([model])
+  @@index([userId])
+  @@index([requestId])
+}
+
+/// إشعارات الأحداث الموجهة لمستخدم (إسناد، تمويل، اعتماد...)
+model NotificationEvent {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  href      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+/// سجل الرسائل البريدية المرسلة (لمنع التكرار)
+model EmailLog {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  to        String
+  subject   String
+  status    String
+  error     String?
+  createdAt DateTime @default(now())
+}
+
+/// إعدادات النظام (نسب المستقطعات وغيرها)
+model Setting {
+  key   String @id
+  value String
+}
+
+/// ═══════════════ الحصر الفعلي والمستخلصات ═══════════════
+
+/// الحصر الفعلي في الموقع: الكميات التراكمية المنفذة حتى تاريخه
+/// status: DRAFT (قيد الإعداد لدى مدير المشروع) | SUBMITTED (أُرسل للمحاسب — مقفل) | CLAIMED (صدرت منه مطالبة)
+model Survey {
+  id          Int          @id @default(autoincrement())
+  tenderId    Int
+  tender      Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  number      Int
+  date        DateTime
+  title       String?
+  notes       String?
+  /// INTERIM (حصر مرحلي) | FINAL (الحصر النهائي → المطالبة النهائية)
+  kind        String       @default("INTERIM")
+  status      String       @default("DRAFT")
+  submittedAt DateTime?
+  claimId     Int?
+  createdById Int
+  createdAt   DateTime     @default(now())
+  lines       SurveyLine[]
+
+  @@index([tenderId])
+}
+
+model SurveyLine {
+  id            Int     @id @default(autoincrement())
+  surveyId      Int
+  survey        Survey  @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  boqItemId     Int
+  cumulativeQty Float
+  notes         String?
+
+  @@unique([surveyId, boqItemId])
+}
+
+/// بنود المطالبة: لقطة ثابتة من الحصر والأسعار وقت الإصدار
+model ClaimLine {
+  id            Int    @id @default(autoincrement())
+  claimId       Int
+  claim         Claim  @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  boqItemId     Int?
+  description   String
+  unit          String
+  unitPrice     Float
+  boqQty        Float
+  previousQty   Float
+  cumulativeQty Float
+  periodQty     Float
+  amount        Float
+
+  @@index([claimId])
+}
+
+/// اليومية الموقعية الرقمية
+model SiteDiary {
+  id          Int      @id @default(autoincrement())
+  tenderId    Int
+  tender      Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  date        DateTime
+  weather     String?
+  workforce   Int      @default(0)
+  workDone    String
+  equipment   String?
+  materials   String?
+  issues      String?
+  createdById Int
+  createdAt   DateTime @default(now())
+
+  @@unique([tenderId, date])
+}
+
+/// وحدة الضريبة: LIABILITY (مديونية مستحقة) | PAYMENT (سداد لدائرة الضريبة)
+model TaxEntry {
+  id          Int      @id @default(autoincrement())
+  kind        String
+  tenderId    Int?
+  claimId     Int?
+  amount      Float
+  rate        Float?
+  base        Float?
+  date        DateTime
+  description String
+  reference   String?
+  createdById Int
+  createdAt   DateTime @default(now())
+
+  @@index([kind])
+  @@index([tenderId])
+  @@index([claimId])
+}
+
+/// المراسلات الداخلية بين المستخدمين
+model Message {
+  id          Int       @id @default(autoincrement())
+  senderId    Int
+  sender      User      @relation("MessageSender", fields: [senderId], references: [id])
+  recipientId Int
+  recipient   User      @relation("MessageRecipient", fields: [recipientId], references: [id])
+  subject     String
+  body        String
+  tenderId    Int?
+  /// مراسلة مرتبطة بمطالبة (معيقات الصرف والتوضيحات بين الإدارة والموقع)
+  claimId     Int?
+  parentId    Int?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([recipientId, readAt])
+  @@index([senderId])
+  @@index([claimId])
+}
+
+/// طلبات المواد والعهد الميدانية
+/// kind: MATERIAL | CUSTODY
+/// status: PENDING_AUDIT (لدى المحاسب) | PENDING_GM (بانتظار المدير العام) | APPROVED | REJECTED | FULFILLED
+/// paymentMethod: CASH | CHEQUE | SUPPLIER_CREDIT
+model FieldRequest {
+  id              Int       @id @default(autoincrement())
+  tenderId        Int
+  tender          Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  boqItemId       Int?
+  kind            String
+  title           String
+  details         String?
+  quantity        Float?
+  unit            String?
+  estimatedAmount Float
+  approvedAmount  Float?
+  paymentMethod   String?
+  status          String    @default("PENDING_AUDIT")
+  requesterId     Int
+  auditedById     Int?
+  auditedAt       DateTime?
+  auditNote       String?
+  decidedById     Int?
+  decidedAt       DateTime?
+  decisionNote    String?
+  fulfilledAt     DateTime?
+  fulfillNote     String?
+  createdAt       DateTime  @default(now())
+
+  @@index([status])
+  @@index([tenderId])
+}
+
+/// تفويض مؤقت: يمارس المفوَّض إليه صلاحيات دور المفوِّض خلال الفترة (يُوثَّق كل إجراء «نيابة عن»)
+model Delegation {
+  id          Int       @id @default(autoincrement())
+  fromUserId  Int
+  toUserId    Int
+  role        String
+  startsAt    DateTime
+  endsAt      DateTime
+  reason      String
+  createdById Int
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([toUserId])
+}
+
+/// مستودع المواد الفائضة: مواد متبقية من المشاريع قابلة للتدوير لمشاريع أخرى
+model SurplusItem {
+  id           Int       @id @default(autoincrement())
+  material     String
+  unit         String
+  quantity     Float
+  unitCost     Float?
+  fromTenderId Int?
+  location     String?
+  notes        String?
+  status       String    @default("AVAILABLE")
+  toTenderId   Int?
+  allocatedQty Float?
+  allocatedAt  DateTime?
+  createdById  Int
+  createdAt    DateTime  @default(now())
+
+  @@index([status])
+}
+
+/// سجل الاستخراج الآلي بالذكاء الاصطناعي (Gemini) — للمراجعة والتدقيق قبل الاعتماد
+model AiExtraction {
+  id         Int       @id @default(autoincrement())
+  kind       String
+  tenderId   Int?
+  fileName   String
+  mimeType   String
+  model      String
+  status     String
+  result     String?
+  error      String?
+  durationMs Int?
+  userId     Int
+  appliedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([kind, createdAt])
+}
+
+/// تذاكر الرفع المباشر إلى Supabase Storage (منطقة عبور مؤقتة) — يصدرها الخادم، وسياسات RLS في التخزين
+/// لا تسمح بالكتابة/القراءة إلا لمسار له تذكرة صالحة. يُنقل الملف بعدها إلى المرفقات أو يُقرأ بالذكاء الاصطناعي ثم يُحذف.
+model UploadTicket {
+  id        Int       @id @default(autoincrement())
+  token     String    @unique
+  path      String    @unique
+  userId    Int
+  fileName  String
+  mimeType  String
+  size      Int
+  purpose   String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+/// فاتورة إرجاع (إشعار دائن — النوع 381) على فاتورة مطالبة معتمدة من نظام الفوترة الوطني.
+/// يعدّها المحاسب ويرسلها بإذن المدير العام: REQUESTED (طلب المحاسب) ← APPROVED (إذن الإدارة) ← إرسال
+/// أو AUTHORIZED (تكليف من الإدارة بمراسلة داخلية) ← يعدّها المحاسب ويرسلها مباشرة.
+/// بعد الإرسال: SUBMITTED | FAILED (عطل اتصال) | REJECTED (رفض النظام) — DECLINED = رفضت الإدارة الطلب
+model EinvReturn {
+  id            Int       @id @default(autoincrement())
+  claimId       Int
+  /// رقم المستند في تسلسل فواتير الشركة (SADA-n) — يُحجز عند الإرسال فقط
+  number        Int?      @unique
+  /// البنود المرتجعة JSON: [{ lineNo, description, unit, qty, price, discount }]
+  lines         String    @default("[]")
+  amount        Float     @default(0)
+  reason        String
+  status        String    @default("REQUESTED")
+  adminNote     String?
+  requestedById Int
+  approvedById  Int?
+  approvedAt    DateTime?
+  uuid          String?
+  qr            String?
+  einvNumber    String?
+  signed        String?
+  error         String?
+  submittedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([claimId])
+}
+
+// ═════════════ بوابة العملاء والمشاريع الخاصة ═════════════
+
+/// حساب عميل (المالك أو المهندس المشرف) — منفصل تماماً عن مستخدمي النظام الداخلي
+model Client {
+  id                 Int            @id @default(autoincrement())
+  name               String
+  email              String         @unique
+  phone              String?
+  /// OWNER المالك | SUPERVISOR المهندس المشرف
+  kind               String         @default("OWNER")
+  passwordHash       String
+  mustChangePassword Boolean        @default(true)
+  active             Boolean        @default(true)
+  lastLoginAt        DateTime?
+  createdById        Int
+  createdAt          DateTime       @default(now())
+  accesses           ClientAccess[]
+}
+
+model ClientAccess {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tenderId  Int
+  tender    Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([clientId, tenderId])
+  @@index([tenderId])
+}
+
+/// خطة العمل (البرنامج الزمني) — يدخلها مدير المشروع وتظهر للعميل
+model WorkPlanItem {
+  id        Int      @id @default(autoincrement())
+  tenderId  Int
+  tender    Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  title     String
+  startDate DateTime
+  endDate   DateTime
+  /// الوزن النسبي للبند في نسبة الإنجاز الكلية
+  weight    Float    @default(1)
+  progress  Int      @default(0)
+  sortOrder Int      @default(0)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenderId])
+}
+
+/// مراسلات البوابة بين الشركة والعميل (مرفقاتها: Attachment entityType=portal_message)
+model PortalMessage {
+  id             Int       @id @default(autoincrement())
+  tenderId       Int
+  tender         Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  fromClientId   Int?
+  fromUserId     Int?
+  senderName     String
+  body           String
+  readByStaffAt  DateTime?
+  readByClientAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([tenderId, createdAt])
+}
+
+/// مستند للتوقيع الرقمي المتبادل: بصمة SHA-256 للمستند + توقيع مرسوم + الوقت والعنوان لكل طرف
+model SignRequest {
+  id                Int       @id @default(autoincrement())
+  tenderId          Int
+  tender            Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  attachmentId      Int?
+  docHash           String?
+  /// COMPANY أنشأته الشركة | CLIENT أنشأه العميل
+  initiatedBy       String
+  /// PENDING_CLIENT | PENDING_COMPANY | COMPLETED | REJECTED
+  status            String
+  companySignerId   Int?
+  companySignerName String?
+  companySignature  String?
+  companySignedAt   DateTime?
+  companyIp         String?
+  clientId          Int?
+  clientSignerName  String?
+  clientSignature   String?
+  clientSignedAt    DateTime?
+  clientIp          String?
+  rejectReason      String?
+  createdAt         DateTime  @default(now())
+
+  @@index([tenderId])
+}
+
+// ═════════════ طلبات التسعير الواردة من موقع الشركة ═════════════
+
+/// SPAM | PM_REVIEW → ACCOUNTANT_REVIEW → ADMIN_REVIEW → APPROVED | REJECTED (المحاسب قد يُرجع لـ PM_REVIEW)
+model QuoteRequest {
+  id              Int          @id @default(autoincrement())
+  ref             String       @unique
+  name            String
+  phone           String
+  email           String?
+  projectType     String
+  city            String?
+  area            String?
+  details         String
+  offer           String?
+  source          String       @default("WEBSITE")
+  ip              String?
+  userAgent       String?
+  spamScore       Int          @default(0)
+  spamReasons     String?
+  status          String
+  assignedPmId    Int?
+  pmNotes         String?
+  pmEstimate      Float?
+  pmPrice         Float?
+  pmSubmittedAt   DateTime?
+  accountantNotes String?
+  adminNotes      String?
+  decidedAt       DateTime?
+  tenderId        Int?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  events          QuoteEvent[]
+
+  @@index([status])
+  @@index([assignedPmId])
+  @@index([phone])
+}
+
+model QuoteEvent {
+  id        Int          @id @default(autoincrement())
+  quoteId   Int
+  quote     QuoteRequest @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  action    String
+  note      String?
+  userId    Int?
+  userName  String?
+  createdAt DateTime     @default(now())
+
+  @@index([quoteId])
+}
+
+// ═════════════ التسويق والعلاقات العامة ═════════════
+
+/// منشور (POST) أو قصة (STORY): اقتراح ذكي أو فكرة مستخدم ← مراجعة ومحادثة ← اعتماد الإدارة ← نشر على فيسبوك وإنستغرام
+model MarketingItem {
+  id                Int       @id @default(autoincrement())
+  kind              String
+  /// AI_DAILY | AI_WEEKLY | AI_EVENT | USER
+  source            String
+  category          String
+  title             String
+  idea              String?
+  caption           String
+  hashtags          String?
+  storyText         String?
+  visualBrief       String?
+  cta               String?
+  scheduledFor      DateTime?
+  /// SUGGESTED | IN_REVIEW | APPROVED | PUBLISHED | REJECTED | FAILED
+  status            String    @default("SUGGESTED")
+  imageAttachmentId Int?
+  imageUrl          String?
+  chat              Json?
+  aiModel           String?
+  fbPostId          String?
+  igMediaId         String?
+  publishLog        String?
+  publishedAt       DateTime?
+  approvedById      Int?
+  approvedAt        DateTime?
+  /// النشر المجدول: يُنشر تلقائياً في هذا التاريخ بعد اعتماد الإدارة (المهمة اليومية)
+  publishAt         DateTime?
+  /// قالب التصميم المؤسسي المستخدم (frame | split | blueprint | stat | story | occasion)
+  template          String?
+  /// صور مكتبة الوسائط المدمجة في التصميم (JSON: أرقام MediaAsset بالترتيب)
+  mediaIds          String?
+  /// تصميم Canva المرتبط (يُصدَّر منه تلقائياً)
+  canvaDesignId     String?
+  /// إعادة الإطلاق: المنشور القديم الذي يحل هذا العنصر محله (JSON: {fb?, ig?, fbLink?, igLink?, at, retired?})
+  relaunchOf        String?
+  createdById       Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status])
+  @@index([scheduledFor])
+}
+
+/// أسرار التكاملات الخارجية (رمز صفحة فيسبوك...) مشفّرة AES-256-GCM — خارج سجل الرقابة (يُسجَّل الحدث دون القيمة)
+model IntegrationSecret {
+  key       String   @id
+  cipher    String
+  meta      String?
+  updatedAt DateTime @updatedAt
+}
+
+/// مكتبة الوسائط: صور حقيقية لمعدات ومشاريع ومواقع الشركة (البوبكات، الجرافات، خزانات الستانلس...) تُدمج مع القوالب
+model MediaAsset {
+  id           Int      @id @default(autoincrement())
+  title        String
+  /// EQUIPMENT | PROJECT | SITE | TANK | TEAM | OTHER
+  category     String
+  tags         String?
+  tenderId     Int?
+  attachmentId Int      @unique
+  usageCount   Int      @default(0)
+  createdById  Int
+  createdAt    DateTime @default(now())
+
+  @@index([category])
+}

@@ -1,0 +1,24 @@
+import "./load-env";
+import "./no-server-only";
+import fs from "fs";
+import { db } from "../src/lib/db";
+import { renderImages } from "../src/lib/design/render";
+import { coverHtml, profileHtml, renderTemplate, SIZES, type TemplateId } from "../src/lib/design/templates";
+(async () => {
+  const out = process.argv[2];
+  const att = await db.attachment.findFirst({ where: { mimeType: { startsWith: "image/" } }, include: { blob: true } });
+  const photo = att?.blob ? `data:${att.mimeType};base64,${Buffer.from(att.blob.data).toString("base64")}` : null;
+  const base = { headline: "صبّينا سقف الطابق الثاني بفيلا عبدون", sub: "86 م³ خرسانة من الساعة 5 الفجر، و14 عامل خلّصوا قبل الظهر", label: "من قلب الموقع", catalog: "SJ · 012", photo };
+  const jobs: [string, string, number, number][] = [];
+  for (const t of ["frame", "split", "blueprint"] as TemplateId[]) jobs.push([t, renderTemplate(t, base, SIZES.post), 1080, 1350]);
+  jobs.push(["stat", renderTemplate("stat", { ...base, stat: { value: "515", unit: "م²" } }, SIZES.post), 1080, 1350]);
+  jobs.push(["story", renderTemplate("story", { ...base, headline: "سقف جديد… بدقة الشاقول" }, SIZES.story), 1080, 1920]);
+  jobs.push(["occasion", renderTemplate("occasion", { headline: "كل عام والأردن بخير", sub: "بمناسبة عيد الاستقلال الثمانين" }, SIZES.post), 1080, 1350]);
+  jobs.push(["profile", profileHtml(), 1080, 1080]);
+  jobs.push(["cover", coverHtml(), 1640, 624]);
+  const t0 = Date.now();
+  const imgs = await renderImages(jobs.map(([, html, w, h]) => ({ html, w, h })));
+  imgs.forEach((b, i) => fs.writeFileSync(`${out}/${jobs[i][0]}.jpg`, b));
+  console.log(`rendered ${imgs.length} in ${Date.now() - t0}ms, photo=${!!photo}`);
+  await db.$disconnect();
+})().catch((e) => { console.error(e); process.exit(1); });

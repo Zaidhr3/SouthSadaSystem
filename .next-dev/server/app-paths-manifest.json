@@ -1,0 +1,5 @@
+{
+  "/login/page": "app/login/page.js",
+  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
+  "/api/cron/alerts/route": "app/api/cron/alerts/route.js"
+}

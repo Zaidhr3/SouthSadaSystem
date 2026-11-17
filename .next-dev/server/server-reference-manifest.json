@@ -1,0 +1,22 @@
+{
+  "node": {
+    "5cfa0bd9d10295026755891d90ee0d2716d227af": {
+      "workers": {
+        "app/login/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Czaida%5C%5CDesktop%5C%5C%D9%85%D9%88%D9%82%D8%B9%20%D8%A7%D9%84%D8%B4%D8%B1%D9%83%D8%A9%5C%5CSouthSadaSystem%5C%5Csrc%5C%5Capp%5C%5Clogin%5C%5Cactions.ts%22%2C%5B%22login%22%2C%22logout%22%5D%5D%5D&__client_imported__=true!"
+      },
+      "layer": {
+        "app/login/page": "action-browser"
+      }
+    },
+    "f3c44a03e3364cf6d0f4d255fd6154a2cd849937": {
+      "workers": {
+        "app/login/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Czaida%5C%5CDesktop%5C%5C%D9%85%D9%88%D9%82%D8%B9%20%D8%A7%D9%84%D8%B4%D8%B1%D9%83%D8%A9%5C%5CSouthSadaSystem%5C%5Csrc%5C%5Capp%5C%5Clogin%5C%5Cactions.ts%22%2C%5B%22login%22%2C%22logout%22%5D%5D%5D&__client_imported__=true!"
+      },
+      "layer": {
+        "app/login/page": "action-browser"
+      }
+    }
+  },
+  "edge": {},
+  "encryptionKey": "9smyuqk+juleGzU+fUemlENMI7+VmqBzhx0fKw3x2lA="
+}

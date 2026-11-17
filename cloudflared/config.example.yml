@@ -1,0 +1,13 @@
+# إعداد Cloudflare Tunnel لنظام صدى الجنوب
+# انسخه إلى: C:\Users\<المستخدم>\.cloudflared\config.yml  ثم عدّل القيم المعلّمة بـ <>
+tunnel: <TUNNEL-ID>
+credentials-file: C:\Users\<USER>\.cloudflared\<TUNNEL-ID>.json
+
+ingress:
+  # الرابط العام → خادم النظام على نفس الجهاز
+  - hostname: erp.<your-domain>.com
+    service: http://localhost:3000
+    originRequest:
+      # رفع ملفات حتى 30 ميغابايت (مرفقات المطالبات والصور)
+      connectTimeout: 30s
+  - service: http_status:404

@@ -1,0 +1,287 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  /* منحنيات حركة بنمط iOS: نابض (spring) مع ارتداد خفيف، واحتياطي للمتصفحات القديمة */
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --spring: cubic-bezier(.34, 1.36, .64, 1);
+  --spring-soft: cubic-bezier(.22, 1.12, .36, 1);
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --spring: linear(0, .009, .035 2.1%, .141 4.4%, .723 12.9%, .938 16.7%, 1.017 19.4%, 1.067, 1.099 24.3%, 1.108 26%, 1.1, 1.077 30.6%, 1.026 35.2%, .993 40.5%, .982 43.4%, .979 47.3%, .997 59.2%, 1.003 67.9%, 1);
+    --spring-soft: linear(0, .063 3.6%, .247 7.9%, .74 18.1%, .935 23.9%, 1.006 28.5%, 1.032 33.4%, 1.034 38.1%, 1.009 50.5%, .998 66.2%, 1);
+  }
+}
+
+html {
+  background-color: #f5f1ea;
+}
+body {
+  background-color: transparent;
+  background-image:
+    radial-gradient(900px 500px at 100% -10%, rgba(242, 177, 52, 0.16), transparent 60%),
+    radial-gradient(700px 500px at -10% 110%, rgba(29, 78, 137, 0.10), transparent 60%),
+    radial-gradient(600px 400px at 40% 50%, rgba(232, 89, 12, 0.04), transparent 70%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+  color: #13203a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "tnum" 1;
+}
+
+@layer base {
+  h1, h2, h3 { letter-spacing: -0.01em; }
+  input[type="date"] { direction: rtl; }
+  input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
+  ::selection { background: #ffe0c2; }
+  /* عناصر الشبكة لا تتمدد بمحتوى عريض (جداول/نصوص برمجية) فتسبب تمريراً أفقياً على الهاتف */
+  .grid > * { min-width: 0; }
+}
+
+@layer components {
+  .card {
+    @apply min-w-0 rounded-[20px] border border-[#13203a]/[0.06] bg-white shadow-card;
+  }
+  .card-pad { @apply p-5 sm:p-6; }
+
+  .label { @apply mb-1.5 block text-[13px] font-semibold text-ink-soft; }
+  .input {
+    @apply block w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[15px] text-ink
+      placeholder:text-ink-faint transition focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/15
+      disabled:bg-canvas disabled:text-ink-muted;
+  }
+  .input-error { @apply border-bad focus:border-bad focus:ring-bad/15; }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold
+      disabled:cursor-not-allowed disabled:opacity-50;
+    transition: transform .45s var(--spring), background-color .2s ease, color .2s ease, box-shadow .2s ease, opacity .2s ease;
+    touch-action: manipulation;
+  }
+  :is(.btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger):active:not(:disabled) { transform: scale(.95); transition-duration: .08s; }
+  .btn-primary { @apply btn bg-gradient-to-l from-accent to-[#f59f0b] text-white shadow-glow hover:brightness-110; }
+  .btn-secondary { @apply btn border border-line bg-white text-ink hover:border-accent/40 hover:bg-accent-soft hover:text-accent; }
+  .btn-ghost { @apply btn text-accent hover:bg-accent-soft; }
+  .btn-danger { @apply btn text-bad hover:bg-bad-soft; }
+  .btn-sm { @apply px-3 py-1.5 text-[13px]; }
+
+  .table-wrap { @apply -mx-5 overflow-x-auto sm:-mx-6; }
+  .tbl { @apply w-full min-w-[640px] text-sm; }
+  .tbl th { @apply whitespace-nowrap border-b border-line bg-[#faf7f1] px-3 py-2.5 text-start text-xs font-bold text-ink-muted first:ps-5 last:pe-5 sm:first:ps-6 sm:last:pe-6; }
+  .tbl td { @apply border-b border-line/70 px-3 py-3 align-middle first:ps-5 last:pe-5 sm:first:ps-6 sm:last:pe-6; }
+  .tbl tbody tr { @apply transition hover:bg-canvas/70; }
+  .tbl tbody tr:last-child td { @apply border-b-0; }
+
+  .num { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+
+  .glass { @apply bg-white/75 backdrop-blur-xl backdrop-saturate-150; }
+
+  /* شريط التبويب السفلي للهاتف — زجاجي، أهداف لمس كبيرة (≥ 48px)، يحترم حافة iPhone */
+  .tabbar {
+    @apply fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-black/[0.08] bg-white/80 backdrop-blur-2xl backdrop-saturate-150;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tab {
+    @apply flex min-h-[56px] flex-1 select-none flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-ink-muted;
+    transition: transform .45s var(--spring), color .2s ease;
+    touch-action: manipulation;
+  }
+  .tab:active { transform: scale(.88); transition-duration: .08s; }
+  .tab-active { @apply text-accent; }
+  .tab-primary > span:first-child { @apply -mt-4 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-[#f59f0b] to-accent text-white shadow-glow ring-4 ring-white; }
+  .tab-primary { @apply text-accent; }
+
+  /* عناصر قابلة للضغط (بطاقات وروابط كبيرة) — ضغطة مرنة كالأيفون */
+  .pressable { transition: transform .5s var(--spring), box-shadow .25s ease, background-color .2s ease; touch-action: manipulation; }
+  .pressable:active { transform: scale(.97); transition-duration: .1s; }
+}
+
+/* ───── الحركة: انتقالات مسرّعة بالعتاد (transform/opacity فقط — بلا إزاحة للتخطيط) ───── */
+@keyframes page-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheet-up {
+  from { transform: translate3d(0, 100%, 0); }
+  to { transform: none; }
+}
+.page-enter { animation: page-in .5s var(--spring-soft) both; will-change: transform, opacity; }
+.stagger > * { animation: rise .6s var(--spring-soft) both; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 50ms; }
+.stagger > *:nth-child(3) { animation-delay: 100ms; }
+.stagger > *:nth-child(4) { animation-delay: 150ms; }
+.stagger > *:nth-child(5) { animation-delay: 200ms; }
+.stagger > *:nth-child(6) { animation-delay: 250ms; }
+.stagger > *:nth-child(n+7) { animation-delay: 300ms; }
+@media (max-width: 639px) {
+  .sheet-mobile { animation: sheet-up .5s var(--spring-soft) both; padding-bottom: env(safe-area-inset-bottom); }
+  /* حقول 16px على الأقل: تمنع iOS من تكبير الصفحة عند الكتابة، وأهداف لمس أكبر */
+  .input, select.input, textarea.input { font-size: 16px; min-height: 46px; }
+  :is(.btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger) { min-height: 44px; }
+  .btn-sm { min-height: 40px; }
+  /* بطاقات المراحل: لمسة مريحة لفتح/طي المرحلة */
+  details > summary { min-height: 52px; }
+}
+/* أجهزة اللمس (جوال/تابلت بأي عرض): أهداف لمس لا تقل عن 44px */
+@media (pointer: coarse) {
+  :is(.btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger), .btn-sm { min-height: 44px; }
+  .input, select.input { min-height: 46px; }
+  input[type="checkbox"] { width: 20px; height: 20px; }
+}
+
+/* ───── وضع كبار السن (المشرف الأعلى): خط أكبر وتباين أعلى للقراءة تحت الشمس ───── */
+.senior { font-size: 17px; }
+.senior .text-ink-muted, .senior .text-ink-faint { color: #38435a; }
+.senior .tbl { font-size: 15px; }
+.senior .tbl th { font-size: 13px; color: #1d1d1f; }
+.senior .label { font-size: 15px; color: #1d1d1f; }
+.senior .card { border-color: rgba(0, 0, 0, .12); }
+.senior .tab { font-size: 12px; }
+
+/* ───── النافذة الإلزامية (تعميم الإدارة) ───── */
+@keyframes notice-in {
+  from { opacity: 0; transform: translate3d(0, 24px, 0) scale(.94); }
+  to { opacity: 1; transform: none; }
+}
+.notice-in { animation: notice-in .6s var(--spring) both; }
+.tbl tbody tr { transition: background-color .15s ease, box-shadow .15s ease; }
+.tbl tbody tr:hover { box-shadow: inset -3px 0 0 #e8590c; }
+.skeleton {
+  background: linear-gradient(90deg, rgba(0,0,0,.05) 25%, rgba(0,0,0,.09) 37%, rgba(0,0,0,.05) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+
+/* ───── حركات ناعمة إضافية: إغلاق النوافذ، فتح البطاقات والقوائم، تبديل التبويبات، ضغط الأزرار ───── */
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes sink { to { opacity: 0; transform: translate3d(0, 12px, 0) scale(.98); } }
+@keyframes sheet-down { to { transform: translate3d(0, 100%, 0); } }
+.modal-closing .modal-backdrop { animation: fade-out .2s ease forwards; }
+.modal-closing .modal-panel { animation: sink .2s ease forwards; }
+@media (max-width: 639px) { .modal-closing .modal-panel { animation: sheet-down .22s ease-in forwards; } }
+details[open] > :not(summary) { animation: rise .35s var(--spring-soft) both; }
+details > summary { transition: background-color .2s ease; }
+.tab-enter { animation: page-in .35s var(--spring-soft) both; }
+:is(.btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger) { transition: transform .35s var(--spring), background-color .2s ease, box-shadow .2s ease; touch-action: manipulation; }
+:is(.btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger):active:not(:disabled) { transform: scale(.96); transition-duration: .08s; }
+.card { transition: box-shadow .25s ease, transform .35s var(--spring-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #d8cfbf; border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+
+@media print {
+  aside, header, .no-print, .tabbar { display: none !important; }
+  main { padding: 0 !important; }
+  .card { box-shadow: none; border-color: #ddd; }
+}
+
+/* ───── الهوية الحيوية: الشريط الجانبي الكحلي، بطاقات تتفاعل، عناوين بخط مميز ───── */
+.sidebar-navy {
+  background:
+    radial-gradient(420px 260px at 100% 0%, rgba(242, 177, 52, 0.18), transparent 70%),
+    radial-gradient(360px 300px at 0% 100%, rgba(232, 89, 12, 0.16), transparent 70%),
+    linear-gradient(180deg, #0b2545 0%, #102c52 55%, #0a1f3b 100%);
+}
+@media (hover: hover) {
+  a > .card:hover, .card.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(19,32,58,.05), 0 20px 40px -18px rgba(11,37,69,.30); }
+}
+.title-bar { background: linear-gradient(90deg, #f2b134, #e8590c); }
+@media print { body { background: #fff !important; } }
+
+/* ═════ الطبقة الحيوية: حركة ناعمة وألوان تتفاعل — تُعطَّل كلها مع «تقليل الحركة» ═════ */
+/* شفق متحرك ببطء خلف كل الصفحات */
+body::before {
+  content: ""; position: fixed; inset: -25%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(32% 28% at 18% 18%, rgba(242, 177, 52, 0.22), transparent 70%),
+    radial-gradient(28% 28% at 82% 28%, rgba(232, 89, 12, 0.13), transparent 70%),
+    radial-gradient(34% 32% at 62% 86%, rgba(29, 78, 137, 0.13), transparent 70%),
+    radial-gradient(24% 24% at 8% 78%, rgba(15, 157, 138, 0.10), transparent 70%);
+  animation: aurora 28s ease-in-out infinite alternate;
+}
+@keyframes aurora {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate3d(3%, -2%, 0) rotate(5deg) scale(1.05); }
+  100% { transform: translate3d(-3%, 2%, 0) rotate(-4deg) scale(1); }
+}
+/* عناوين بتدرّج لوني وشريط ذهبي يتدفق */
+.text-gradient { background: linear-gradient(90deg, #e8590c 0%, #1d4e89 45%, #0b2545 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.title-bar { background: linear-gradient(90deg, #f2b134, #e8590c, #f59f0b, #f2b134); background-size: 300% 100%; animation: flow 4s linear infinite; }
+@keyframes flow { to { background-position: 300% 0; } }
+/* العنصر النشط في القائمة: تدرّج يلمع */
+.nav-active { background: linear-gradient(100deg, #f2b134 0%, #f59f0b 40%, #ffd27a 50%, #f59f0b 60%, #f2b134 100%); background-size: 250% 100%; animation: flow 6s linear infinite; }
+/* لمعة تعبر الأزرار الرئيسية */
+.btn-primary { position: relative; overflow: hidden; isolation: isolate; }
+.btn-primary::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%); transform: translateX(130%); transition: transform 0.8s ease; }
+.btn-primary:hover::after { transform: translateX(-130%); }
+.btn-primary > * { position: relative; }
+/* البطاقات: توهج عند المرور، ورفع للبطاقات التفاعلية */
+@media (hover: hover) {
+  .card:hover { box-shadow: 0 0 0 1px rgba(232, 89, 12, 0.14), 0 1px 2px rgba(19, 32, 58, 0.05), 0 18px 40px -22px rgba(11, 37, 69, 0.30); }
+  .hover-lift:hover { transform: translateY(-3px); }
+  .tbl tbody tr:hover { background-color: #fff4e9 !important; }
+}
+/* الجداول: صفوف متناوبة دافئة */
+.tbl tbody tr:nth-child(even) { background-color: rgba(245, 241, 234, 0.45); }
+/* الحقول: عنوان الحقل يتلوّن عند التركيز */
+div:has(> .input:focus) > .label, div:has(> div > .input:focus) > .label { color: #e8590c; }
+.input:hover:not(:focus):not(:disabled) { border-color: #dccbb2; }
+:focus-visible { outline-color: #e8590c; }
+/* أشرطة التقدم: تدرّج مخطط متحرك */
+.progress-fill { background: linear-gradient(90deg, #f2b134, #e8590c); background-size: 200% 100%; position: relative; overflow: hidden; }
+.progress-fill::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.22) 0 8px, transparent 8px 16px); animation: stripes 1.2s linear infinite; }
+@keyframes stripes { to { background-position: 32px 0; } }
+.bar-grow { animation: grow 0.9s var(--spring-soft) both; transform-origin: right; }
+@keyframes grow { from { transform: scaleX(0); } }
+/* نقطة حية للحالات المعلقة، ونبض لشارات التنبيهات */
+.dot-live::after { content: ""; position: absolute; inset: -3px; border-radius: 9999px; background: currentColor; opacity: 0.5; animation: ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite; }
+@keyframes ping { 75%, 100% { transform: scale(2.2); opacity: 0; } }
+.badge-ping { box-shadow: 0 0 0 0 rgba(215, 0, 21, 0.55); animation: ring 2s ease-out infinite; }
+@keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(215, 0, 21, 0.5); } 80%, 100% { box-shadow: 0 0 0 7px rgba(215, 0, 21, 0); } }
+/* أيقونة الحالة الفارغة تطفو */
+.float-y { animation: floaty 3.2s ease-in-out infinite; }
+@keyframes floaty { 50% { transform: translateY(-6px); } }
+/* شريط تحميل علوي عند الانتقال بين الصفحات */
+.route-progress { position: fixed; top: 0; inset-inline: 0; z-index: 70; height: 3px; background: linear-gradient(90deg, transparent, #f2b134, #e8590c, transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: route 1s ease-in-out infinite; }
+@keyframes route { from { background-position: -50% 0; } to { background-position: 150% 0; } }
+/* الإشعارات المنبثقة */
+.toast-in { animation: toast 0.55s var(--spring) both; }
+@keyframes toast { from { opacity: 0; transform: translate3d(0, 18px, 0) scale(0.92); } }
+/* بطاقات الدخول المتتابعة أسرع وأكثر حيوية */
+.stagger > * { animation-duration: 0.7s; }
+::-webkit-scrollbar-thumb:hover { background-color: #f2b134; }
+@media (prefers-reduced-motion: reduce) {
+  body::before, .title-bar, .nav-active, .progress-fill::after, .dot-live::after, .badge-ping, .float-y, .route-progress { animation: none !important; }
+}
+@media print { body::before { display: none; } .text-gradient { color: #13203a; background: none; } }
+
+/* ═════ الأداء على الهواتف والأجهزة اللمسية: نفس الألوان، بلا رسم متواصل في الخلفية ═════ */
+/* الخلفية الثابتة والشفق المتحرك يُعاد رسمهما مع كل تمرير على الهاتف فيُبطئان التمرير ويستهلكان البطارية */
+@media (max-width: 1023px), (pointer: coarse) {
+  body { background-attachment: scroll; }
+  body::before { animation: none; inset: 0; }
+  .title-bar, .nav-active, .progress-fill::after { animation: none; }
+  .glass, .tabbar { -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); }
+}
+
+/* الحقول المخفية التي يضيفها React لإجراءات الخادم في أول النموذج تدفع أول حقل للأسفل (فراغ زائد أعلى كل نموذج) */
+[class*="space-y-"] > input[type="hidden"] + :not(input[type="hidden"]) { margin-top: 0 !important; }
