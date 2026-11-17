@@ -6,6 +6,7 @@ import { HOOK_PROMPT, HUMAN_RULES, PLAN_PROMPT } from "./content-skills/skills";
 import { humanizeClean } from "./content-skills/humanizer";
 import { checkFacts, fabricationIssues } from "./content-skills/fact-guard";
 import { knownNames } from "./content-skills/known-names";
+import { skillsPrompt } from "./assistant/skills";
 
 /**
  * قسم التسويق والعلاقات العامة الذكي:
@@ -223,6 +224,7 @@ function hedged<T>(make: (attempt: number) => Promise<T>): Promise<T> {
  * ما ينجح يُحفظ فوراً، وفشل جزء لا يُسقط الباقي، ولا يتجاوز الزمن الكلي حد الصفحة على Vercel.
  */
 export async function suggestWeek(userId: number | null, source: "AI_WEEKLY" | "AI_DAILY" = "AI_WEEKLY", opts: { budgetMs?: number } = {}) {
+  const sys = SYSTEM + (await skillsPrompt("marketing"));
   const today = todayUTC();
   const days = source === "AI_DAILY" ? 2 : 7;
   const [facts, planned, recent] = await Promise.all([
@@ -264,7 +266,7 @@ ${PLAN_PROMPT}` });
     jobs.map((j) =>
       hedged((n) =>
         writeJson<{ items: GenItem[] }>({
-          system: SYSTEM,
+          system: sys,
           effort: n === 0 ? j.effort : "low",
           timeoutMs: budget - n * HEDGE_AFTER_MS,
           maxTokens: j.label === "المنشورات" ? 9000 : 6000,
@@ -297,9 +299,10 @@ ${i.storyText}`, facts);
 /** مسار فكرة المستخدم: يحوّل فكرة حرة إلى منشور أو قصة (أو الاثنين) */
 /** توليد سريع لعناصر قليلة: طلب احتياطي متوازٍ + رفض النص المنهار والأرقام غير الموجودة في المصدر */
 async function quickItems(source: string, opts: { turns: Turn[] }) {
+  const sys = SYSTEM + (await skillsPrompt("marketing"));
   return hedged((n) =>
     writeJson<{ items: GenItem[] }>({
-      system: SYSTEM,
+      system: sys,
       effort: n === 0 ? "medium" : "low",
       timeoutMs: 90_000 - n * HEDGE_AFTER_MS,
       maxTokens: 7000,
@@ -319,6 +322,7 @@ ${i.storyText}`, source).length);
  * باستدعاءين متوازيين سريعين (~10 ثوانٍ) — تُحفظ كمقترحات للمراجعة، ومحمية بحارس الاختلاق.
  */
 export async function brainstorm(focus: string, userId: number) {
+  const sys = SYSTEM + (await skillsPrompt("marketing"));
   const [facts, recent] = await Promise.all([companyFacts(), db.marketingItem.findMany({ where: { createdAt: { gte: addDays(todayUTC(), -30) } }, select: { title: true }, orderBy: { id: "desc" }, take: 30 })]);
   const avoid = recent.map((r) => r.title).join("؛ ") || "لا شيء";
   const angles = [
@@ -329,7 +333,7 @@ export async function brainstorm(focus: string, userId: number) {
     angles.map((a) =>
       hedged((n) =>
         writeJson<{ items: GenItem[] }>({
-          system: SYSTEM,
+          system: sys,
           effort: n === 0 ? "high" : "low",
           timeoutMs: 80_000 - n * HEDGE_AFTER_MS,
           maxTokens: 7000,
@@ -380,6 +384,7 @@ export async function eventPost(type: "CONGRATS" | "CONDOLENCE" | "DENOUNCE", de
 
 /** المحادثة على عنصر: تعديل بالتوجيه، ويُحفظ سجل المحادثة */
 export async function refineItem(itemId: number, message: string, userName: string) {
+  const sys = SYSTEM + (await skillsPrompt("marketing"));
   const it = await db.marketingItem.findUnique({ where: { id: itemId } });
   if (!it) throw new Error("العنصر غير موجود");
   const history = (Array.isArray(it.chat) ? it.chat : []) as { role: "user" | "assistant"; text: string; at: string; by?: string }[];
@@ -392,7 +397,7 @@ export async function refineItem(itemId: number, message: string, userName: stri
   ];
   const names = await knownNames();
   const { data, model } = await writeJson<GenItem & { reply: string }>({
-    system: SYSTEM,
+    system: sys,
     effort: "medium",
     schema: { type: "object", properties: { ...ITEM.properties, reply: { type: "string" } } },
     turns,

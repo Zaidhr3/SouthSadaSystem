@@ -7,8 +7,11 @@ import { callMeta, getMetaConfig } from "@/lib/meta";
 import { TEMPLATES, type TemplateId } from "@/lib/design/templates";
 import { fmtDate } from "@/lib/format";
 import { Badge, Card, PageHeader } from "@/components/ui";
+import { ActionForm } from "@/components/forms";
+import { designPending } from "../../actions/design";
 
 export const metadata = { title: "شبكة إنستغرام" };
+export const maxDuration = 300;
 
 type Tile = { key: string; src: string; href: string; upcoming: boolean; label?: string; date?: Date | null; template?: string | null; carousel?: boolean };
 
@@ -44,7 +47,16 @@ export default async function GridPage() {
   ];
   return (
     <>
-      <PageHeader back={{ href: "/marketing", label: "التسويق" }} title="شبكة إنستغرام" subtitle="المنشورات القادمة (بإطار ذهبي) فوق آخر منشورات الحساب الفعلية — كما ستظهر للزائر" />
+      <PageHeader
+        back={{ href: "/marketing", label: "التسويق" }}
+        title="شبكة إنستغرام"
+        subtitle="المنشورات القادمة (بإطار ذهبي) فوق آخر منشورات الحساب الفعلية — كما ستظهر للزائر. كل مربع بشكل مختلف: صورة بإطار، شكل هندسي مرسوم، مقسوم، مخطط."
+        actions={
+          <ActionForm action={designPending} submitLabel="صمّم كل الناقص ذكياً">
+            <span />
+          </ActionForm>
+        }
+      />
       {liveError && <p className="mb-4 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">{liveError}</p>}
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -65,10 +77,11 @@ export default async function GridPage() {
         <Card title="قواعد الكتالوج الهندسي">
           <ul className="space-y-2 text-sm leading-7 text-ink-soft">
             <li>• كل منشور يحمل رقم كتالوج متسلسل <b dir="ltr">SJ · 0NN</b> أسفل التصميم.</li>
-            <li>• القالب يتناوب تلقائياً: {(["frame", "blueprint", "split"] as TemplateId[]).map((t) => TEMPLATES[t].name).join(" ← ")} — فتتكون أعمدة متناسقة في الشبكة (3 أعمدة).</li>
+            <li>• القالب يتناوب تلقائياً: {(["frame", "motif", "split", "blueprint"] as TemplateId[]).map((t) => TEMPLATES[t].name).join(" ← ")} — دورة رباعية على شبكة ثلاثية فلا يتكرر الشكل في صف ولا عمود.</li>
             <li>• المقاس 1080×1350 (4:5) لكل المنشورات: يملأ مساحة الشبكة الجديدة دون قص.</li>
             <li>• الكاروسيل لعرض مراحل المشروع (قبل/أثناء/بعد) بشرائح متسلسلة وشريحة ختام بالتواصل.</li>
             <li>• الألوان ثابتة: كحلي، ذهبي، برتقالي — والشعار الأصلي في نفس المكان دائماً.</li>
+            <li>• «شكل هندسي»: رسم يولّده الذكاء الاصطناعي لموضوع المنشور (رافعة، جرافة، خزان، مغسلة...) — رسم توضيحي لا يُقدَّم كصورة مشروع حقيقي.</li>
           </ul>
           <div className="mt-4 flex flex-wrap gap-2">
             {upcoming.length > 0 && <Badge tone="orange">{upcoming.length} قادم</Badge>}

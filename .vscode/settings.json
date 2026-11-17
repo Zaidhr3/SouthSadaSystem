@@ -1,0 +1,10 @@
+{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": false,
+  "[prisma]": { "editor.defaultFormatter": "Prisma.prisma" },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "tailwindCSS.experimental.classRegex": [["clsx\(([^)]*)\)", "[\"'`]([^\"'`]*).*?[\"'`]"]],
+  "files.eol": "\n",
+  "search.exclude": { "**/.next*": true, "**/node_modules": true, "src/lib/letterhead-data.ts": true, "src/lib/design/fonts.ts": true, "src/lib/design/brand.ts": true },
+  "gitlens.codeLens.enabled": true
+}

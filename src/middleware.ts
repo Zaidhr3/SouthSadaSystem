@@ -20,6 +20,7 @@ const RULES: { prefix: string; roles: string[] }[] = [
   { prefix: "/system", roles: ["ADMIN"] },
   { prefix: "/audit", roles: ["ADMIN", "CHAIRMAN", "AUDITOR"] },
   { prefix: "/marketing", roles: ["ADMIN", "CHAIRMAN"] },
+  { prefix: "/assistant", roles: ["ADMIN", "CHAIRMAN"] },
   ...["/guarantees", "/cheques", "/debts", "/documents", "/reports", "/taxes", "/einvoices", "/api/export/financial"].map((prefix) => ({ prefix, roles: ["ADMIN", "ACCOUNTANT", "CHAIRMAN", "AUDITOR"] })),
 ];
 

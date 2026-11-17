@@ -16,9 +16,9 @@ import { CHECK_LABEL, detect, structuralFlags, VERDICT, type CheckName } from "@
 import { SKILLS } from "@/lib/content-skills/skills";
 import { SkillRunner } from "../skill-runner";
 import { CalendarClock, Fingerprint, MessagesSquare, Palette, Sparkles } from "lucide-react";
-import { composeAction, importCanva } from "../../actions/design";
+import { composeAction, importCanva, smartComposeAction } from "../../actions/design";
 import { TEMPLATES, type TemplateId } from "@/lib/design/templates";
-import { canvaStatus } from "@/lib/canva";
+import { canvaStatus, listDesigns } from "@/lib/canva";
 
 export const metadata = { title: "محتوى تسويقي" };
 /** توليد التصاميم بالمتصفح + النشر (كاروسيل) قد يستغرقان دقيقة */
@@ -41,6 +41,7 @@ export default async function MarketingItemPage({ params }: { params: { id: stri
     canvaStatus(),
   ]);
   slides.sort((a, b) => Number(a.slot!.slice(6)) - Number(b.slot!.slice(6)));
+  const canvaDesigns = canva.connected ? await listDesigns(8).catch(() => []) : [];
   const chosen: number[] = it.mediaIds ? (JSON.parse(it.mediaIds).ids ?? []) : [];
   // متصل فعلياً للنشر: الرمز سليم ويملك صلاحية النشر
   const connected = !!meta?.configured && meta.ok && !meta.missingScopes?.includes("pages_manage_posts");
@@ -216,6 +217,15 @@ export default async function MarketingItemPage({ params }: { params: { id: stri
                   ))}
                 </div>
               )}
+              <div className="mb-4 rounded-2xl border border-accent/25 bg-accent-soft/40 p-3">
+                <p className="mb-2 text-sm font-bold text-accent">✦ المصمم الذكي — يختار الصورة الصح من المكتبة أو يرسم شكلاً هندسياً للموضوع (رافعة، جرافة، خزان، مغسلة...) ويختار القالب بما ينوّع الشبكة</p>
+                <ActionForm action={smartComposeAction.bind(null, id)} submitLabel="صمّمه أنت">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <Select name="style" label="أسلوب الرسم" options={[{ value: "line", label: "خطوط هندسية" }, { value: "render", label: "مجسم ثلاثي الأبعاد" }]} defaultValue="line" />
+                    <label className="mb-2 flex items-center gap-2 text-sm font-semibold"><input type="checkbox" name="fresh" /> ارسم من جديد (لا تعيد استخدام رسم سابق)</label>
+                  </div>
+                </ActionForm>
+              </div>
               <ActionForm action={composeAction.bind(null, id)} submitLabel={slides.length ? "إعادة التصميم" : "صمّم بالقالب المؤسسي"}>
                 <Grid>
                   <Select name="template" label="القالب" options={[{ value: "auto", label: "تلقائي (تناسق شبكة إنستغرام)" }, ...Object.entries(TEMPLATES).map(([value, t]) => ({ value, label: `${t.name} — ${t.photo === "required" ? "بصورة" : t.photo === "none" ? "بلا صورة" : "صورة اختيارية"}` }))]} defaultValue="auto" />
@@ -242,6 +252,19 @@ export default async function MarketingItemPage({ params }: { params: { id: stri
               </ActionForm>
               {canva.connected ? (
                 <div className="mt-4 border-t border-line pt-4">
+                  {canvaDesigns.length > 0 && (
+                    <div className="mb-3">
+                      <p className="label">آخر تصاميمك في Canva — استيراد بضغطة</p>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {canvaDesigns.map((d) => (
+                          <ActionForm key={d.id} action={importCanva.bind(null, id)} submitLabel={d.title.slice(0, 22)} className="[&_button]:w-full [&_button]:text-xs">
+                            <input type="hidden" name="link" value={d.id} />
+                            {d.thumb && <img src={d.thumb} alt="" referrerPolicy="no-referrer" className="aspect-[4/5] w-full rounded-lg border border-line object-cover" />}
+                          </ActionForm>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <ActionForm action={importCanva.bind(null, id)} submitLabel="استيراد من Canva">
                     <Input name="link" label="أو استورد تصميماً جاهزاً من Canva" dir="ltr" placeholder="https://www.canva.com/design/…" hint="كل صفحات التصميم تصبح شرائح بالترتيب (JPG 1080)" />
                   </ActionForm>

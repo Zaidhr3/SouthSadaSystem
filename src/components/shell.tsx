@@ -41,12 +41,13 @@ import {
   Wallet,
   X,
   type LucideIcon,
-  ReceiptText, Scale, Inbox, Megaphone
+  ReceiptText, Scale, Inbox, Megaphone, Bot
 } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { Logo } from "./logo";
 import { CraneMark } from "./crane-mark";
 import { ReadOnlyProvider, haptic } from "./forms";
+import { AssistantFab, CommandBar } from "./command-bar";
 
 type Role = "ADMIN" | "ACCOUNTANT" | "PM" | "CHAIRMAN" | "AUDITOR";
 const READ_ONLY: Role[] = ["CHAIRMAN", "AUDITOR"];
@@ -57,6 +58,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "",
     items: [
       { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
+      { href: "/assistant", label: "المساعد الذكي", icon: Bot, roles: ["ADMIN", "CHAIRMAN"] },
       { href: "/notifications", label: "التنبيهات", icon: Bell },
       { href: "/messages", label: "المراسلات الداخلية", icon: MessagesSquare },
     ],
@@ -266,6 +268,7 @@ export function AppShell({
 
       <main className="min-w-0 flex-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 lg:px-10 lg:pb-12 lg:pt-8">
         <div className="mx-auto max-w-[1280px]">
+          <CommandBar name={user.name} canAsk={user.role === "ADMIN" || user.role === "CHAIRMAN"} />
           {readOnly && (
             <p className="no-print mb-4 flex items-center gap-2 rounded-2xl bg-navy px-4 py-2.5 text-sm font-bold text-gold shadow-card">
               <Eye className="h-4 w-4 shrink-0" aria-hidden /> وضع الاطلاع — يمكنك مشاهدة كل البيانات دون تعديل
@@ -275,6 +278,7 @@ export function AppShell({
         </div>
       </main>
 
+      {(user.role === "ADMIN" || user.role === "CHAIRMAN") && !pathname.startsWith("/assistant") && <AssistantFab />}
       <TabBar role={user.role} unread={unread} unreadMessages={unreadMessages} onMore={() => setOpen(true)} />
     </div>
     </ReadOnlyProvider>

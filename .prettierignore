@@ -1,0 +1,7 @@
+node_modules
+.next*
+package-lock.json
+src/lib/letterhead-data.ts
+src/lib/design/fonts.ts
+src/lib/design/brand.ts
+src/lib/content-skills/vendor

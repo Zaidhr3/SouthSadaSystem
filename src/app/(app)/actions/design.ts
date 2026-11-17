@@ -6,7 +6,7 @@ import { actionUser } from "@/lib/auth";
 import { auditEvent, run, runVoid, type ActionState } from "@/lib/action";
 import { AppError, can } from "@/lib/permissions";
 import { saveAttachments, validateAttachments } from "@/lib/uploads";
-import { composeItem } from "@/lib/design/compose";
+import { composeItem, smartCompose } from "@/lib/design/compose";
 import { TEMPLATES, coverHtml, profileHtml, type TemplateId } from "@/lib/design/templates";
 import { renderImages } from "@/lib/design/render";
 import { CanvaError, designIdFrom, exportDesign, saveCanvaApp } from "@/lib/canva";
@@ -14,7 +14,7 @@ import { deleteSecret } from "@/lib/secret-box";
 import { applyPageImage, MetaError } from "@/lib/meta";
 
 const t = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
-const CATS = ["EQUIPMENT", "PROJECT", "SITE", "TANK", "TEAM", "OTHER"];
+const CATS = ["EQUIPMENT", "PROJECT", "SITE", "TANK", "TEAM", "ILLUSTRATION", "OTHER"];
 
 /** رفع صور لمكتبة الوسائط (صور حقيقية فقط: معدات، مشاريع، مواقع) */
 export async function uploadMedia(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -68,6 +68,24 @@ export async function composeAction(itemId: number, _: ActionState, fd: FormData
       return `صُمّم: ${TEMPLATES[res.template].name} — ${res.slides} ${res.slides > 1 ? "شرائح كاروسيل" : "صورة"} — ${res.catalog}`;
     } catch (e) {
       throw new AppError(`تعذر التصميم: ${e instanceof Error ? e.message : e}`);
+    }
+  });
+  revalidatePath(`/marketing/${itemId}`);
+  revalidatePath("/marketing/grid");
+  return r;
+}
+
+/** المصمم الذكي: يختار الصورة أو يرسم الشكل المناسب ويختار القالب بنفسه */
+export async function smartComposeAction(itemId: number, _: ActionState, fd: FormData): Promise<ActionState> {
+  const r = await run(async () => {
+    const user = await actionUser(can.manageMarketing);
+    const it = await db.marketingItem.findUnique({ where: { id: itemId }, select: { status: true } });
+    if (!it || it.status === "PUBLISHED") throw new AppError("لا يمكن تعديل تصميم عنصر منشور");
+    try {
+      const res = await smartCompose(itemId, user.id, { style: fd.get("style") === "render" ? "render" : "line", fresh: fd.get("fresh") === "on" });
+      return `${TEMPLATES[res.template].name}${res.motif ? ` — رسم: ${res.motif}` : ""} (${res.catalog}). ${res.why ?? ""}`;
+    } catch (e) {
+      throw new AppError(`تعذر التصميم الذكي: ${e instanceof Error ? e.message : e}`);
     }
   });
   revalidatePath(`/marketing/${itemId}`);
@@ -130,9 +148,21 @@ export async function disconnectCanva() {
 export async function generateBrandKit(_: ActionState, __: FormData): Promise<ActionState> {
   const r = await run(async () => {
     const user = await actionUser(can.manageMarketing);
+    // خلفية الغلاف: رسم هندسي احترافي مولّد بهوية الشركة (موقع بناء برافعات وهياكل) — الشعار والنص فوقه بالقالب
+    let art: string | undefined;
+    try {
+      const { generateImage } = await import("@/lib/design/imagegen");
+      const g = await generateImage(
+        "Wide cinematic panoramic illustration for a construction company cover: modern building skeleton under construction with two tower cranes at dusk, precise architectural line-art blended with soft volumetric light, deep navy blue (#0b2545) dominant palette with warm gold (#f2b134) and orange (#e8590c) glowing accents, subtle blueprint grid overlay, elegant and premium, calm empty area in the center. Absolutely no text, no letters, no logos, no watermark, no people.",
+        "16:9",
+      );
+      art = `data:${g.mime};base64,${g.buf.toString("base64")}`;
+    } catch {
+      art = undefined; // بلا ذكاء اصطناعي: الغلاف بالتصميم الهندسي الثابت
+    }
     const [profile, cover] = await renderImages([
       { html: profileHtml(1080), w: 1080, h: 1080 },
-      { html: coverHtml(1640, 624), w: 1640, h: 624 },
+      { html: coverHtml(1640, 624, art), w: 1640, h: 624 },
     ]);
     await db.attachment.deleteMany({ where: { entityType: "brand", entityId: 1 } });
     for (const [slot, buf] of [["profile", profile], ["cover", cover]] as const) {
@@ -161,5 +191,30 @@ export async function applyBrandImage(slot: "profile" | "cover", _: ActionState,
     return `طُبّقت ${slot === "profile" ? "الصورة الشخصية" : "صورة الغلاف"} على فيسبوك`;
   });
   revalidatePath("/marketing/brand");
+  return r;
+}
+
+/** تصميم جماعي ذكي: المنشورات المقترحة/المعتمدة بلا تصميم (4 في كل ضغطة) */
+export async function designPending(_: ActionState, __: FormData): Promise<ActionState> {
+  const r = await run(async () => {
+    const user = await actionUser(can.manageMarketing);
+    const todo = await db.marketingItem.findMany({ where: { kind: "POST", imageAttachmentId: null, status: { in: ["SUGGESTED", "IN_REVIEW", "APPROVED"] }, source: { notIn: ["AUDIT_FB", "AUDIT_IG"] } }, orderBy: [{ publishAt: "asc" }, { scheduledFor: "asc" }], take: 4, select: { id: true } });
+    if (!todo.length) return "كل المنشورات مصممة ✓";
+    const done: string[] = [];
+    const failed: string[] = [];
+    // بالتتابع: رقم الكتالوج والتناوب يعتمدان على ما قبله
+    for (const t of todo) {
+      try {
+        const res = await smartCompose(t.id, user.id);
+        done.push(`${res.catalog}${res.motif ? ` (${res.motif})` : ""}`);
+      } catch (e) {
+        failed.push(`#${t.id}: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    const left = await db.marketingItem.count({ where: { kind: "POST", imageAttachmentId: null, status: { in: ["SUGGESTED", "IN_REVIEW", "APPROVED"] }, source: { notIn: ["AUDIT_FB", "AUDIT_IG"] } } });
+    return `صُمّم ${done.length}: ${done.join("، ")}${left ? ` — بقي ${left}، اضغط مجدداً` : ""}${failed.length ? ` (تعذّر: ${failed.join(" | ")})` : ""}`;
+  });
+  revalidatePath("/marketing/grid");
+  revalidatePath("/marketing");
   return r;
 }

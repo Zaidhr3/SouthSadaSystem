@@ -1,7 +1,8 @@
 import Link from "next/link";
 import clsx from "clsx";
 import type { Prisma } from "@prisma/client";
-import { RefreshCcw, Images, LayoutGrid, Palette } from "lucide-react";
+import { RefreshCcw, Images, LayoutGrid, Palette, Facebook, Instagram, UserRoundSearch } from "lucide-react";
+import { VERDICT } from "@/lib/social";
 import { CalendarDays, Fingerprint, Lightbulb, Megaphone, Radar, Sparkles, Wand2 } from "lucide-react";
 import { runPageAuditAction } from "../actions/meta";
 import { requireUser } from "@/lib/auth";
@@ -44,6 +45,7 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
   const occ = occasionsBetween(today, 30);
   const ai = writerName();
   const meta = await metaStatus();
+  const social = await db.socialPost.findMany({ where: { gone: false }, select: { platform: true, verdict: true, decision: true } });
 
   return (
     <>
@@ -59,6 +61,24 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
         }
         subtitle={<>محتوى ذكي مبني على مشاريع الشركة الفعلية — الاستراتيجية: 1–2 منشور أسبوعياً و1–2 قصة يومياً. {ai ? <Badge tone="purple">الكاتب: {ai}</Badge> : <Badge tone="red">الذكاء الاصطناعي غير مُعد</Badge>} {meta?.configured ? (meta.ok ? <Badge tone="green">فيسبوك{meta.hasInstagram ? " + إنستغرام" : ""} مربوط{meta.pageName ? ` — ${meta.pageName}` : ""}</Badge> : <Badge tone="red">انقطع ربط فيسبوك — أعد الربط من الإعدادات</Badge>) : <Badge tone="gray">النشر التلقائي غير مربوط — نشر يدوي</Badge>}</>}
       />
+      <Link href="/marketing/accounts" className="mb-5 block rounded-3xl bg-gradient-to-l from-navy via-navy-2 to-navy-3 p-5 text-white shadow-card transition hover:shadow-lg">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10"><UserRoundSearch className="h-6 w-6 text-gold" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-black">حساباتي — فيسبوك وإنستغرام</p>
+            <p className="text-sm text-white/70">
+              <Facebook className="me-1 inline h-4 w-4" />{social.filter((x) => x.platform === "FB").length} منشور · <Instagram className="me-1 inline h-4 w-4" />{social.filter((x) => x.platform === "IG").length} منشور — شو تحذف، شو تخفي، شو تخلي، وشو تموّل
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(VERDICT).map(([k, v]) => {
+              const n = social.filter((x) => x.verdict === k && !x.decision).length;
+              return n ? <span key={k} className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">{v.label} <b className="text-gold">{n}</b></span> : null;
+            })}
+            {!social.length && <span className="rounded-full bg-gold px-3 py-1 text-xs font-black text-navy">ابدأ التحليل ←</span>}
+          </div>
+        </div>
+      </Link>
       <div className="mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatCard label="بانتظار المراجعة" value={c(["SUGGESTED", "IN_REVIEW", "FAILED"])} icon={Lightbulb} tone="orange" />
         <StatCard label="معتمد للنشر" value={c(["APPROVED"])} icon={Sparkles} tone="blue" />

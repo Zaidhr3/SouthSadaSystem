@@ -8,6 +8,9 @@ import { suggestWeek } from "@/lib/marketing";
 import { writerConfigured } from "@/lib/ai/writer";
 import { publishDue } from "@/lib/marketing-publish";
 import { checkMeta, metaConfigured } from "@/lib/meta";
+import { analyzeSocial, syncSocial } from "@/lib/social";
+import { runIntegrityChecks } from "@/lib/assistant/integrity";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -31,15 +34,30 @@ export async function GET(req: Request) {
   });
   // الأرشفة التلقائية (انقضاء مدد الصيانة) واقتراحات التسويق الصباحية — كلٌ مستقل
   const archives = await syncAllArchives().catch((e) => ({ error: e instanceof Error ? e.message : "error" }));
-  const marketing = writerConfigured() ? await suggestWeek(null, new Date().getUTCDay() === 6 ? "AI_WEEKLY" : "AI_DAILY").then((x) => x.length).catch((e) => ({ error: e instanceof Error ? e.message : "error" })) : 0;
-  // فحص صحة ربط فيسبوك/إنستغرام (ينبّه المدير عند انتهاء الرمز) ثم نشر المحتوى المجدول الذي حلّ موعده
+  // فحص ربط فيسبوك/إنستغرام ثم النشر المجدول أولاً (قبل أي عمل ذكاء اصطناعي طويل) — المواعيد لا تتأخر
   const meta = (await metaConfigured()) ? await checkMeta().then((s) => ({ ok: s.ok, error: s.error })).catch((e) => ({ ok: false, error: String(e) })) : { ok: false, error: "not configured" };
   const scheduled = meta.ok ? await publishDue().catch((e) => ({ error: e instanceof Error ? e.message : "error" })) : { skipped: meta.error };
+  // مركز الحسابات: تحديث الأرقام وحكم المحلل يومياً
+  const social = meta.ok ? await syncSocial().then(async (s) => ({ ...s, accounts: undefined, analyzed: writerConfigured() ? (await analyzeSocial()).analyzed : 0 })).catch((e) => ({ error: e instanceof Error ? e.message : "error" })) : { skipped: true };
+  const marketing = writerConfigured() ? await suggestWeek(null, new Date().getUTCDay() === 6 ? "AI_WEEKLY" : "AI_DAILY").then((x) => x.length).catch((e) => ({ error: e instanceof Error ? e.message : "error" })) : 0;
+  // فحص السلامة اليومي: كل فحص فاشل يُسجَّل في سجل المشاكل (مرة واحدة حتى يُحل)
+  const health = await runIntegrityChecks()
+    .then(async (r) => {
+      let logged = 0;
+      for (const c of r.results.filter((x) => !x.ok && x.count > 0)) {
+        const title = `فحص يومي: ${c.label}`;
+        if (await db.systemIssue.findFirst({ where: { title, status: "OPEN" } })) continue;
+        await db.systemIssue.create({ data: { title, detail: `العدد: ${c.count}`, severity: c.label.includes("RLS") || c.label.includes("كلمة مرور") ? "CRITICAL" : "MEDIUM", area: "بيانات", source: "CRON", suggestion: c.hint ?? null } });
+        logged++;
+      }
+      return { failed: r.results.filter((x) => !x.ok).length, logged };
+    })
+    .catch((e) => ({ error: e instanceof Error ? e.message : "error" }));
   try {
     const result = await runAlertJob();
     // تنظيف منطقة عبور الرفع المباشر (ملفات رُفعت ولم يُحفظ نموذجها)
     const staging = await cleanupStaging().catch((e) => ({ removed: 0, error: e instanceof Error ? e.message : "error" }));
-    return NextResponse.json({ ok: true, ...result, staging, backup, archives, marketing, meta, scheduled, at: new Date().toISOString() });
+    return NextResponse.json({ ok: true, ...result, staging, backup, archives, marketing, meta, scheduled, social, health, at: new Date().toISOString() });
   } catch (e) {
     console.error("[cron/alerts]", e);
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "error", backup }, { status: 500 });

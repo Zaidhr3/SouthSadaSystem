@@ -6,11 +6,12 @@ import { BRAND as C, BRAND_CLASS, BRAND_EN, BRAND_NAME, BRAND_PHONE, LOGO_DATA_U
  * عناصر الهوية الثابتة: الشعار الأصلي، الإطار الهندسي (زوايا ذهبية + شبكة مخطط + خطوط أبعاد)، الكحلي/الذهبي/البرتقالي،
  * ورقم كتالوج «SJ·012» يجعل شبكة إنستغرام تبدو ككتالوج هندسي متسلسل.
  */
-export type TemplateId = "frame" | "split" | "blueprint" | "stat" | "story" | "occasion" | "condolence";
+export type TemplateId = "frame" | "split" | "blueprint" | "motif" | "stat" | "story" | "occasion" | "condolence";
 export const TEMPLATES: Record<TemplateId, { name: string; desc: string; photo: "required" | "optional" | "none" }> = {
   frame: { name: "إطار هندسي", desc: "صورة كاملة بإطار الزوايا الذهبية وشريط العنوان — للمشاريع والمعدات", photo: "required" },
   split: { name: "مقسوم", desc: "صورة في الأعلى ولوحة كحلية بالعنوان — للإنجازات ومن قلب الموقع", photo: "required" },
   blueprint: { name: "مخطط أزرق", desc: "خلفية مخطط هندسي بعنوان كبير — للنصائح والقيم بلا صورة", photo: "none" },
+  motif: { name: "شكل هندسي", desc: "أرضية رملية فاتحة برسم هندسي كبير (رافعة، جرافة، خزان، مغسلة...) — يكسر تكرار الشبكة", photo: "required" },
   stat: { name: "رقم بارز", desc: "رقم حقيقي من النص (مساحة، طوابق، أيام) بحجم كبير", photo: "optional" },
   story: { name: "قصة عمودية", desc: "1080×1920 بنص الشاشة الكبير", photo: "optional" },
   occasion: { name: "مناسبة وطنية/دينية", desc: "رصين بزخرفة ذهبية", photo: "none" },
@@ -51,7 +52,9 @@ window.__ready=true;
 
 const logo = () => `<div class="logo"><img src="${LOGO_DATA_URL}" alt=""><span><b>صدى الجنوب</b><small>للمقاولات الإنشائية</small></span></div>`;
 const corners = () => `<div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>`;
-const foot = (s: SlideInput) => `<div class="foot"><span class="cat">${esc(s.catalog ?? "SADA")}</span><span class="ph">${s.cta ? esc(s.cta) : BRAND_PHONE}</span></div>`;
+/** سطر التواصل: الدعوة القصيرة فقط، والطويلة تُستبدل بالرقم (لا تزاحم رقم الكتالوج) */
+const ctaLine = (s: SlideInput) => (s.cta && s.cta.length <= 34 ? esc(s.cta) : `واتساب ${BRAND_PHONE}`);
+const foot = (s: SlideInput) => `<div class="foot"><span class="cat">${esc(s.catalog ?? "SADA")}</span><span class="ph">${ctaLine(s)}</span></div>`;
 
 export function renderTemplate(t: TemplateId, s: SlideInput, size: { w: number; h: number }): string {
   const { w, h } = size;
@@ -87,6 +90,17 @@ ${logo()}
 <h1 data-fit="36" style="font-size:${big ? 58 : 84}px;margin-top:26px;max-height:${Math.round(h * (big ? 0.2 : 0.34))}px;overflow:hidden">${esc(s.headline)}</h1>${sub}</div>
 <div class="dim" style="left:76px;right:76px;bottom:122px"></div>${foot(s)}`);
     }
+    case "motif":
+      return BASE(w, h, `
+<div style="position:absolute;inset:0;background:#f5f1ea"></div>
+<div style="position:absolute;inset:0;background-image:linear-gradient(rgba(11,37,69,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(11,37,69,.06) 1px,transparent 1px);background-size:40px 40px"></div>
+<div style="position:absolute;top:150px;left:90px;right:90px;height:${Math.round(h * 0.5)}px;background:url('${s.photo ?? ""}') center/contain no-repeat;mix-blend-mode:multiply;-webkit-mask-image:radial-gradient(closest-side,#000 82%,transparent 100%)"></div>
+<div class="corner tl" style="border-color:${C.navy}"></div><div class="corner tr" style="border-color:${C.navy}"></div><div class="corner bl" style="border-color:${C.orange}"></div><div class="corner br" style="border-color:${C.orange}"></div>
+${logo().replace('class="logo"', 'class="logo" style="box-shadow:0 6px 18px rgba(11,37,69,.18)"')}
+<div style="position:absolute;right:86px;left:86px;top:${Math.round(h * 0.5) + 170}px;bottom:150px;overflow:hidden;color:${C.navy}">${label}
+<h1 data-fit="34" style="font-size:64px;margin-top:18px;max-height:${Math.round(h * 0.17)}px;overflow:hidden;color:${C.navy}">${esc(s.headline)}</h1>${s.sub ? `<p data-fit="22" style="font-size:30px;font-weight:700;line-height:1.55;margin-top:12px;color:#38435a;max-height:${Math.round(h * 0.1)}px;overflow:hidden">${esc(s.sub)}</p>` : ""}</div>
+<div class="dim" style="left:86px;right:86px;bottom:122px;background:${C.navy}"></div>
+<div class="foot" style="color:${C.navy}"><span class="cat" style="color:${C.orange}">${esc(s.catalog ?? "SADA")}</span><span class="ph" style="color:${C.navy}">${ctaLine(s)}</span></div>`);
     case "story":
       return BASE(w, h, `
 ${s.photo ? `<div class="photo" style="inset:0;background-image:url('${s.photo}')"></div>` : `<div style="position:absolute;inset:0;background:linear-gradient(170deg,${C.navy} 0%,${C.navy3} 55%,${C.orange} 130%)"></div><div class="grid"></div>`}
@@ -127,12 +141,15 @@ export function profileHtml(size = 1080) {
 }
 
 /** هوية الحسابات: الغلاف (فيسبوك 1640×624 — المنطقة الآمنة في الوسط لظهوره على الهاتف) */
-export function coverHtml(w = 1640, h = 624) {
+const COVER_DECO = `<svg style="position:absolute;left:40px;bottom:0;opacity:.13" width="560" height="560" viewBox="0 0 200 200" fill="none" stroke="#fff" stroke-width="2"><path d="M40 200V40h8v160M44 40l120 0M44 40l30 -20 90 20M164 40v40M156 80h16v14h-16zM44 60l20 -20M44 80l20 -20M44 100l20 -20M44 120l20 -20M44 140l20 -20M44 160l20 -20M44 180l20 -20"/></svg>`;
+
+export function coverHtml(w = 1640, h = 624, art?: string) {
   const services = ["أبنية وفلل", "إسكانات ومجمعات", "هياكل خرسانية", "خزانات مياه", "بنية تحتية", "تشطيبات"];
   return BASE(w, h, `
 <div style="position:absolute;inset:0;background:radial-gradient(45% 80% at 85% 0%,rgba(242,177,52,.28),transparent 70%),radial-gradient(40% 90% at 0% 100%,rgba(232,89,12,.25),transparent 70%),linear-gradient(160deg,${C.navy} 0%,${C.navy2} 55%,#0a1f3b 100%)"></div>
-<div class="grid"></div>
-<svg style="position:absolute;left:40px;bottom:0;opacity:.13" width="560" height="560" viewBox="0 0 200 200" fill="none" stroke="#fff" stroke-width="2"><path d="M40 200V40h8v160M44 40l120 0M44 40l30 -20 90 20M164 40v40M156 80h16v14h-16zM44 60l20 -20M44 80l20 -20M44 100l20 -20M44 120l20 -20M44 140l20 -20M44 160l20 -20M44 180l20 -20"/></svg>
+${art ? `<div class="photo" style="inset:0;background-image:url('${art}')"></div><div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,22,41,.25) 0%,rgba(6,22,41,.86) 22%,rgba(6,22,41,.9) 78%,rgba(6,22,41,.25) 100%)"></div>` : ""}
+<div class="grid" style="opacity:${art ? 0.45 : 1}"></div>
+${art ? "" : COVER_DECO}
 <div style="position:absolute;top:0;bottom:0;left:${w * 0.2}px;right:${w * 0.2}px;display:flex;align-items:center;justify-content:center;gap:44px">
 <div style="background:#fff;border-radius:32px;padding:22px 26px;box-shadow:0 18px 40px rgba(0,0,0,.4)"><img src="${LOGO_DATA_URL}" style="height:150px;display:block"></div>
 <div><div style="font-size:70px;font-weight:900;line-height:1.1">${BRAND_NAME}</div>

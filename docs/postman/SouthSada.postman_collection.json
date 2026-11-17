@@ -1,0 +1,62 @@
+{
+  "info": {
+    "name": "South Sada ERP — APIs",
+    "description": "اختبار واجهات النظام والتكاملات الخارجية قبل دمجها. كل المفاتيح متغيرات في بيئة Postman (لا تُحفظ في المستودع): base_url, cron_secret, meta_token, page_id, ig_user_id, graph_version, canva_token, gemini_key.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://south-sada.vercel.app" },
+    { "key": "graph_version", "value": "v23.0" },
+    { "key": "page_id", "value": "106112717962500" }
+  ],
+  "item": [
+    {
+      "name": "النظام",
+      "item": [
+        {
+          "name": "طلب عرض سعر من الموقع (RFQ)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Origin", "value": "https://sadaaljanoub-website.vercel.app" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/public/rfq",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"اختبار Postman\",\n  \"phone\": \"0791234567\",\n  \"type\": \"فيلا / سكن خاص\",\n  \"city\": \"عمّان\",\n  \"details\": \"اختبار — احذف الطلب من صفحة طلبات التسعير\",\n  \"_elapsed\": 30000\n}" },
+            "description": "يُنشئ طلباً حقيقياً ويُبلّغ الإدارة ومدراء المشاريع — احذفه بعد الاختبار."
+          }
+        },
+        {
+          "name": "CORS — تحقق النطاق المسموح",
+          "request": { "method": "OPTIONS", "header": [{ "key": "Origin", "value": "https://sadaaljanoobcompany.com" }], "url": "{{base_url}}/api/public/rfq" }
+        },
+        {
+          "name": "المهمة الصباحية (Cron)",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{cron_secret}}" }], "url": "{{base_url}}/api/cron/alerts", "description": "تشغيل يدوي: نسخة احتياطية، أرشفة، اقتراحات، نشر مجدول، تنبيهات." }
+        }
+      ]
+    },
+    {
+      "name": "Meta Graph API",
+      "item": [
+        { "name": "فحص الرمز وصلاحياته", "request": { "method": "GET", "url": "https://graph.facebook.com/{{graph_version}}/me/permissions?access_token={{meta_token}}" } },
+        { "name": "بيانات الصفحة والمتابعون", "request": { "method": "GET", "url": "https://graph.facebook.com/{{graph_version}}/{{page_id}}?fields=name,followers_count,fan_count,instagram_business_account&access_token={{meta_token}}" } },
+        { "name": "آخر منشورات فيسبوك مع التفاعل", "request": { "method": "GET", "url": "https://graph.facebook.com/{{graph_version}}/{{page_id}}/posts?fields=id,message,created_time,permalink_url,reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares&limit=10&access_token={{meta_token}}" } },
+        { "name": "آخر منشورات إنستغرام", "request": { "method": "GET", "url": "https://graph.facebook.com/{{graph_version}}/{{ig_user_id}}/media?fields=id,caption,media_type,media_product_type,like_count,comments_count,permalink,timestamp&limit=10&access_token={{meta_token}}" } }
+      ]
+    },
+    {
+      "name": "Canva Connect",
+      "item": [
+        { "name": "المستخدم الحالي", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{canva_token}}" }], "url": "https://api.canva.com/rest/v1/users/me" } },
+        { "name": "آخر التصاميم", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{canva_token}}" }], "url": "https://api.canva.com/rest/v1/designs?ownership=owned&sort_by=modified_descending&limit=10" } }
+      ]
+    },
+    {
+      "name": "Gemini",
+      "item": [
+        { "name": "النماذج المتاحة (نص وصور)", "request": { "method": "GET", "header": [{ "key": "x-goog-api-key", "value": "{{gemini_key}}" }], "url": "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" } }
+      ]
+    }
+  ]
+}

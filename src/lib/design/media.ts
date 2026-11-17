@@ -1,1 +1,1 @@
-export const MEDIA_CATEGORY: Record<string, string> = { EQUIPMENT: "معدات وآليات", PROJECT: "مشاريع منجزة", SITE: "مواقع العمل", TANK: "خزانات ستانلس", TEAM: "الفريق", OTHER: "أخرى" };
+export const MEDIA_CATEGORY: Record<string, string> = { EQUIPMENT: "معدات وآليات", PROJECT: "مشاريع منجزة", SITE: "مواقع العمل", TANK: "خزانات ستانلس", TEAM: "الفريق", ILLUSTRATION: "رسومات مولّدة", OTHER: "أخرى" };

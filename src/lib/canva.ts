@@ -125,3 +125,9 @@ export async function exportDesign(designId: string): Promise<{ title?: string; 
   }
   return { title: meta.design?.title, images };
 }
+
+/** آخر تصاميم الحساب في Canva (للاستيراد بضغطة بلا نسخ روابط) */
+export async function listDesigns(limit = 12): Promise<{ id: string; title: string; thumb?: string; updated?: number }[]> {
+  const j = await api<{ items?: { id: string; title?: string; thumbnail?: { url?: string }; updated_at?: number }[] }>("GET", `/designs?ownership=owned&sort_by=modified_descending&limit=${limit}`);
+  return (j.items ?? []).map((d) => ({ id: d.id, title: d.title || "بلا عنوان", thumb: d.thumbnail?.url, updated: d.updated_at }));
+}

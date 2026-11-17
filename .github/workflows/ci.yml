@@ -1,0 +1,40 @@
+# فحص آلي لكل رفع وطلب دمج: الأنواع (TypeScript)، التحليل (ESLint)، واختبارات المؤنسن وحارس الحقائق.
+# النشر نفسه يتولاه Vercel تلقائياً (معاينة لكل فرع، والإنتاج من main) — لا أسرار هنا.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # قيم وهمية: التوليد والفحص لا يتصلان بقاعدة البيانات
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      AUTH_SECRET: ci-only-not-a-real-secret-000000000000
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prisma client
+        run: node scripts/sync-db-provider.mjs && npx prisma generate
+      - name: TypeScript
+        run: npx tsc --noEmit -p .
+      - name: ESLint
+        run: npx next lint --max-warnings=200
+      - name: Unit tests (humanizer, fact guard)
+        run: |
+          npx tsx scripts/test-humanizer.ts
+          npx tsx scripts/test-fact-guard.ts

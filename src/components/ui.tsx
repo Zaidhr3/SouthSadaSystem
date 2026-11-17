@@ -17,8 +17,8 @@ export function PageHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0">
+    <div className="page-hero mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="relative min-w-0">
         {back && (
           <Link href={back.href} className="mb-1 inline-block text-sm font-semibold text-accent hover:underline">
             ‹ {back.label}
@@ -28,7 +28,7 @@ export function PageHeader({
         <h1 className="text-gradient text-2xl font-extrabold sm:text-[30px]">{title}</h1>
         {subtitle && <div className="mt-1 text-[15px] text-ink-muted">{subtitle}</div>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="relative flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }

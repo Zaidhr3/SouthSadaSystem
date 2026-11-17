@@ -19,6 +19,7 @@ const nextConfig = {
       "/marketing/[id]": ["./node_modules/@sparticuz/chromium/bin/**"],
       "/marketing/brand": ["./node_modules/@sparticuz/chromium/bin/**"],
       "/marketing/relaunch": ["./node_modules/@sparticuz/chromium/bin/**"],
+      "/marketing/grid": ["./node_modules/@sparticuz/chromium/bin/**"],
     },
   },
   poweredByHeader: false,

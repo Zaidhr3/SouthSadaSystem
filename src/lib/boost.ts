@@ -1,0 +1,137 @@
+import "server-only";
+import { db } from "./db";
+import { writeJson } from "./ai/writer";
+import { getSecret, setSecret } from "./secret-box";
+import { getMetaConfig } from "./meta";
+import type { Metrics } from "./social";
+
+/**
+ * التمويل الإعلاني الذكي:
+ *  1) المستشار يقرأ أداء المنشور مقارنة بمتوسط الحساب ومحتواه ونوعه (الريل أولى) ويحكم: يستحق أم لا، ومقترح الميزانية والمدة والجمهور.
+ *  2) التمويل الفعلي عبر Meta Marketing API (حملة ← مجموعة إعلانية ← تصميم من المنشور نفسه ← إعلان) —
+ *     لا يُنشأ إلا بموافقة صريحة من المدير العام، وضمن سقف شهري، وبرمز إعلانات مستقل (ads_management).
+ */
+export type AdsConfig = { token: string; adAccountId: string; monthlyCap: number; currency?: string };
+const SECRET = "meta_ads";
+const V = () => process.env.META_GRAPH_VERSION || "v23.0";
+
+export async function adsConfig(): Promise<AdsConfig | null> {
+  if (process.env.META_ADS_TOKEN && process.env.META_AD_ACCOUNT_ID) return { token: process.env.META_ADS_TOKEN, adAccountId: process.env.META_AD_ACCOUNT_ID, monthlyCap: Number(process.env.BOOST_MONTHLY_CAP || 100) };
+  const s = await getSecret<AdsConfig>(SECRET);
+  return s?.value ?? null;
+}
+
+async function ads<T>(method: "GET" | "POST", path: string, params: Record<string, string>, token: string): Promise<T> {
+  const url = new URL(`https://graph.facebook.com/${V()}/${path}`);
+  const body = new URLSearchParams({ ...params, access_token: token });
+  if (method === "GET") body.forEach((v, k) => url.searchParams.set(k, v));
+  const res = await fetch(url, { method, ...(method === "POST" ? { body } : {}), signal: AbortSignal.timeout(30_000), cache: "no-store" });
+  const j = (await res.json().catch(() => ({}))) as T & { error?: { message?: string; error_user_msg?: string; code?: number } };
+  if (!res.ok || j.error) throw new Error(`Meta Ads: ${j.error?.error_user_msg || j.error?.message || res.status}`);
+  return j;
+}
+
+/** حفظ إعداد الإعلانات بعد التحقق من الحساب الإعلاني والرمز */
+export async function saveAdsConfig(token: string, adAccountId: string, monthlyCap: number) {
+  const id = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId.replace(/\D/g, "")}`;
+  const acc = await ads<{ name?: string; currency?: string; account_status?: number }>("GET", id, { fields: "name,currency,account_status" }, token);
+  if (acc.account_status !== 1) throw new Error("الحساب الإعلاني غير فعّال (معطل أو بانتظار الدفع) — فعّله من Meta Ads Manager");
+  await setSecret(SECRET, { token, adAccountId: id, monthlyCap, currency: acc.currency }, { name: acc.name, savedAt: new Date().toISOString() });
+  return { name: acc.name, currency: acc.currency };
+}
+
+/** صرف الشهر الحالي (المخطط) من الحملات النشطة/المنتهية */
+async function monthSpend() {
+  const start = new Date();
+  start.setUTCDate(1);
+  start.setUTCHours(0, 0, 0, 0);
+  const rows = await db.adBoost.findMany({ where: { status: { in: ["ACTIVE", "DONE", "PAUSED"] }, createdAt: { gte: start } }, select: { dailyBudget: true, days: true } });
+  return rows.reduce((a, r) => a + r.dailyBudget * r.days, 0);
+}
+
+export type BoostAdvice = { worth: boolean; score: number; summary: string; suggestedDaily: number; suggestedDays: number; audience: string; objective: string };
+
+export async function boostAdvice(postId: string): Promise<BoostAdvice> {
+  const p = await db.socialPost.findUnique({ where: { id: postId } });
+  if (!p) throw new Error("المنشور غير موجود — حدّث الحسابات");
+  const peers = await db.socialPost.findMany({ where: { platform: p.platform, gone: false }, select: { metrics: true, mediaType: true } });
+  const eng = (m: unknown) => (m as Metrics | null)?.engagement ?? 0;
+  const avg = peers.length ? peers.reduce((a, x) => a + eng(x.metrics), 0) / peers.length : 0;
+  const best = Math.max(0, ...peers.map((x) => eng(x.metrics)));
+  const m = (p.metrics as Metrics | null) ?? { likes: 0, comments: 0, shares: 0, engagement: 0 };
+  const cfg = await adsConfig();
+  const { data } = await writeJson<BoostAdvice>({
+    system: `أنت مستشار إعلانات Meta محترف لشركة مقاولات أردنية صغيرة (صدى الجنوب، درجة رابعة). قرر بصدق إن كان هذا المنشور يستحق التمويل الآن.
+المعايير: الأداء النسبي مقابل متوسط الحساب وأفضل منشور، نوع المحتوى (الريل والفيديو والقبل/بعد أعلى أداءً في الإعلانات)، وضوح الخدمة والدعوة للتواصل (واتساب/عرض سعر)، جودة الصورة، وارتباطه بعمل حقيقي. منشور ضعيف التفاعل لا يُموَّل — المال يضخّم الناجح ولا يصلح الضعيف.
+الميزانية المقترحة صغيرة وواقعية لحساب صغير (بعملة الحساب ${cfg?.currency ?? "USD"})، والجمهور: الأردن، المهتمون بالبناء والعقار وأصحاب الأراضي، 25–60. الهدف: رسائل/تفاعل. لا تخترع أرقام أداء غير المعطاة.`,
+    effort: "medium",
+    timeoutMs: 60_000,
+    maxTokens: 3000,
+    schema: { type: "object", properties: { worth: { type: "boolean" }, score: { type: "integer" }, summary: { type: "string", description: "الحكم والسبب بالدليل، 2–4 جمل" }, suggestedDaily: { type: "number" }, suggestedDays: { type: "integer" }, audience: { type: "string" }, objective: { type: "string" } } },
+    turns: [{ role: "user", text: `المنصة: ${p.platform === "FB" ? "فيسبوك" : "إنستغرام"} | النوع: ${p.mediaType} | التاريخ: ${p.postedAt.toISOString().slice(0, 10)}\nالأداء: إعجاب ${m.likes}، تعليق ${m.comments}، مشاركة ${m.shares} — تفاعل موزون ${m.engagement}\nمتوسط الحساب ${avg.toFixed(1)}، أفضل منشور ${best}، عدد المنشورات ${peers.length}\nالنص:\n${p.text ?? "— بلا نص —"}` }],
+  });
+  const advice = { ...data, score: Math.max(0, Math.min(100, Math.round(data.score))), suggestedDays: Math.max(1, Math.min(30, Math.round(data.suggestedDays || 5))), suggestedDaily: Math.max(1, Number(data.suggestedDaily) || 5) };
+  await db.socialPost.update({ where: { id: postId }, data: { boostScore: advice.score } });
+  await db.adBoost.create({ data: { postId, platform: p.platform, dailyBudget: advice.suggestedDaily, days: advice.suggestedDays, analysis: JSON.stringify(advice), status: "DRAFT", createdById: 0 } });
+  return advice;
+}
+
+const ZERO_DECIMAL = new Set(["JPY", "KRW", "CLP", "COP", "CRC", "HUF", "ISK", "IDR", "PYG", "TWD", "VND"]);
+
+export async function createBoost(postId: string, opts: { daily: number; days: number }, userId: number) {
+  const cfg = await adsConfig();
+  if (!cfg) throw new Error("التمويل غير مُعد: أضف رمز الإعلانات (ads_management) ورقم الحساب الإعلاني من «إعداد التمويل»");
+  const p = await db.socialPost.findUnique({ where: { id: postId } });
+  if (!p) throw new Error("المنشور غير موجود");
+  if (!(opts.daily > 0 && opts.days >= 1 && opts.days <= 30)) throw new Error("حدد ميزانية يومية ومدة (1–30 يوماً)");
+  const total = opts.daily * opts.days;
+  const spent = await monthSpend();
+  if (spent + total > cfg.monthlyCap) throw new Error(`يتجاوز السقف الشهري (${cfg.monthlyCap} ${cfg.currency ?? ""}) — المخطط هذا الشهر ${spent.toFixed(2)}، والمطلوب ${total.toFixed(2)}`);
+  const meta = await getMetaConfig();
+  if (!meta) throw new Error("صفحة فيسبوك غير مربوطة");
+  const minor = (v: number) => String(Math.round(v * (ZERO_DECIMAL.has(cfg.currency ?? "") ? 1 : 100)));
+  const boost = await db.adBoost.create({ data: { postId, platform: p.platform, dailyBudget: opts.daily, days: opts.days, status: "DRAFT", createdById: userId } });
+  const log: string[] = [];
+  try {
+    const name = `صدى الجنوب — ${p.platform} ${p.postedAt.toISOString().slice(0, 10)} (#${boost.id})`;
+    const camp = await ads<{ id: string }>("POST", `${cfg.adAccountId}/campaigns`, { name, objective: "OUTCOME_ENGAGEMENT", status: "ACTIVE", special_ad_categories: "[]", is_adset_budget_sharing_enabled: "false" }, cfg.token);
+    log.push(`حملة ${camp.id}`);
+    const start = new Date(Date.now() + 10 * 60_000);
+    const end = new Date(start.getTime() + opts.days * 86400_000);
+    const set = await ads<{ id: string }>(
+      "POST",
+      `${cfg.adAccountId}/adsets`,
+      {
+        name,
+        campaign_id: camp.id,
+        daily_budget: minor(opts.daily),
+        billing_event: "IMPRESSIONS",
+        optimization_goal: "POST_ENGAGEMENT",
+        bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+        targeting: JSON.stringify({ geo_locations: { countries: ["JO"] }, age_min: 25, age_max: 60, publisher_platforms: p.platform === "IG" ? ["instagram"] : ["facebook"] }),
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        status: "ACTIVE",
+        promoted_object: JSON.stringify({ page_id: meta.pageId }),
+      },
+      cfg.token,
+    );
+    log.push(`مجموعة ${set.id}`);
+    const creative = await ads<{ id: string }>(
+      "POST",
+      `${cfg.adAccountId}/adcreatives`,
+      p.platform === "FB"
+        ? { name, object_story_id: p.id.includes("_") ? p.id : `${meta.pageId}_${p.id}` }
+        : { name, object_id: meta.pageId, ...(meta.igUserId ? { instagram_user_id: meta.igUserId } : {}), source_instagram_media_id: p.id },
+      cfg.token,
+    );
+    const ad = await ads<{ id: string }>("POST", `${cfg.adAccountId}/ads`, { name, adset_id: set.id, creative: JSON.stringify({ creative_id: creative.id }), status: "ACTIVE" }, cfg.token);
+    log.push(`إعلان ${ad.id}`);
+    await db.adBoost.update({ where: { id: boost.id }, data: { status: "ACTIVE", campaignId: camp.id, adSetId: set.id, adId: ad.id, log: log.join(" · ") } });
+    await db.socialPost.update({ where: { id: postId }, data: { decision: "DONE" } });
+    return { id: boost.id, message: `انطلق التمويل: ${opts.daily} ${cfg.currency ?? ""} يومياً لمدة ${opts.days} أيام — يمكنك متابعته وإيقافه من Meta Ads Manager` };
+  } catch (e) {
+    await db.adBoost.update({ where: { id: boost.id }, data: { status: "FAILED", log: `${log.join(" · ")}\n${e instanceof Error ? e.message : e}` } });
+    throw e;
+  }
+}
