@@ -12,6 +12,7 @@ import * as labels from "../labels";
 import { QUOTE_STATUS } from "../quotes";
 import { MKT_STATUS } from "../marketing";
 import { propose } from "./actions";
+import { redact } from "./redact";
 import { tenderCoords } from "../external/geo";
 import { forecast } from "../external/weather";
 import { jodRates } from "../external/fx";
@@ -25,7 +26,16 @@ export type ToolDef = { name: string; description: string; parameters: { type: "
 export type ToolCtx = { threadId: number };
 type Handler = (args: Record<string, unknown>, user: AppUser, ctx: ToolCtx) => Promise<unknown>;
 
-const FORBIDDEN = /("?IntegrationSecret"?|"?AttachmentBlob"?|passwordHash|"?UploadTicket"?|"?Setting"?\b|pg_shadow|pg_authid|\bauth\.|\bstorage\.|current_setting|dblink|pg_read|pg_ls|lo_import|copy\s)/i;
+const FORBIDDEN = /("?IntegrationSecret"?|"?AttachmentBlob"?|passwordHash|"?UploadTicket"?|"?Setting"?\b|pg_shadow|pg_authid|\bauth\.|\bstorage\.|current_setting|set_config|dblink|\bpg_\w+\s*\(|\blo_\w+|copy\s|(query|table|schema|database|cursor)_to_(xml|json)|xpath|\bexecute\b|\bprepare\b)/i;
+
+/**
+ * الحماية الأساسية للاستعلام الحر (ثغرة F3): تشغيله بدور قاعدة بيانات للقراءة فقط
+ * لا يرى إلا views منقّاة في المخطط ai (بلا كلمات مرور ولا أسرار) — scripts/setup-assistant-role.ts.
+ * القائمة السوداء أعلاه وتنقية النتائج أدناه طبقة ثانية فقط: يمكن الالتفاف على أي قائمة نصية.
+ */
+const ASSISTANT_ROLE = (process.env.ASSISTANT_DB_ROLE || "").trim();
+let warnedNoRole = false;
+
 
 /** ملخص بنية قاعدة البيانات من Prisma (الجداول، الحقول، العلاقات) — مصدر فهم المساعد للنظام */
 function schemaDoc(filter?: string) {
@@ -74,9 +84,16 @@ export const TOOLS: (ToolDef & { run: Handler })[] = [
       const rows = await db.$transaction(async (tx) => {
         await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
         await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '8s'");
+        if (/^[a-z_][a-z0-9_]{0,62}$/.test(ASSISTANT_ROLE)) {
+          await tx.$executeRawUnsafe(`SET LOCAL ROLE ${ASSISTANT_ROLE}`);
+          await tx.$executeRawUnsafe("SET LOCAL search_path = ai");
+        } else if (!warnedNoRole) {
+          warnedNoRole = true;
+          console.warn("[assistant] ASSISTANT_DB_ROLE غير مضبوط — الاستعلام الحر يعمل بصلاحية النظام الكاملة مع الحماية النصية فقط. شغّل npm run db:assistant");
+        }
         return tx.$queryRawUnsafe<Record<string, unknown>[]>(`SELECT * FROM (${sql}) q LIMIT 200`);
       });
-      return { rows: json(rows), count: rows.length };
+      return { rows: redact(json(rows)), count: rows.length };
     },
   },
   {

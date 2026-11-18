@@ -34,7 +34,8 @@ jobs:
         run: npx tsc --noEmit -p .
       - name: ESLint
         run: npx next lint --max-warnings=200
-      - name: Unit tests (humanizer, fact guard)
+      - name: Unit tests (humanizer, fact guard, security)
         run: |
           npx tsx scripts/test-humanizer.ts
           npx tsx scripts/test-fact-guard.ts
+          npx tsx scripts/test-security.ts

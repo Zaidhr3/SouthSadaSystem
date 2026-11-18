@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getClient } from "@/lib/client-session";
-import { readAttachmentData } from "@/lib/uploads";
+import { attachmentHeaders, readAttachmentData } from "@/lib/uploads";
 import { CLIENT_VISIBLE } from "@/lib/portal";
 
 export const dynamic = "force-dynamic";
@@ -21,13 +21,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   if (!tenderId || !client.accesses.some((a) => a.tenderId === tenderId)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const buf = await readAttachmentData(att);
   if (!buf) return NextResponse.json({ error: "file missing" }, { status: 410 });
-  const inline = att.mimeType.startsWith("image/") || att.mimeType === "application/pdf";
   return new NextResponse(new Uint8Array(buf), {
-    headers: {
-      "Content-Type": att.mimeType,
-      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(att.fileName)}`,
-      "Cache-Control": "private, max-age=3600",
-      "X-Content-Type-Options": "nosniff",
-    },
+    headers: attachmentHeaders(att, { "Content-Length": String(buf.length), "Cache-Control": "private, max-age=3600" }),
   });
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { attachmentTenderId, readAttachmentData } from "@/lib/uploads";
+import { attachmentHeaders, attachmentTenderId, readAttachmentData } from "@/lib/uploads";
 
 export const dynamic = "force-dynamic";
 
@@ -24,16 +24,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
   const buf = await readAttachmentData(att);
   if (!buf) return NextResponse.json({ error: "file missing" }, { status: 410 });
-  {
-    const inline = att.mimeType.startsWith("image/") || att.mimeType === "application/pdf";
-    return new NextResponse(new Uint8Array(buf), {
-      headers: {
-        "Content-Type": att.mimeType,
-        "Content-Length": String(buf.length),
-        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(att.fileName)}`,
-        "Cache-Control": "private, max-age=3600",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
-  }
+  return new NextResponse(new Uint8Array(buf), {
+    headers: attachmentHeaders(att, { "Content-Length": String(buf.length), "Cache-Control": "private, max-age=3600" }),
+  });
 }

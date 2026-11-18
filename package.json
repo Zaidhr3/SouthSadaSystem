@@ -9,7 +9,7 @@
     "start": "next start -p 3000 -H 0.0.0.0",
     "lint": "next lint",
     "typecheck": "tsc --noEmit -p .",
-    "db:push": "node scripts/sync-db-provider.mjs && prisma db push && tsx scripts/enable-rls.ts",
+    "db:push": "node scripts/sync-db-provider.mjs && prisma db push && tsx scripts/enable-rls.ts && tsx scripts/setup-assistant-role.ts",
     "db:seed": "node scripts/sync-db-provider.mjs && prisma db seed",
     "db:reset": "node scripts/sync-db-provider.mjs && prisma db push --force-reset && prisma db seed",
     "setup": "node scripts/sync-db-provider.mjs && prisma db push && tsx scripts/enable-rls.ts && prisma db seed",
@@ -24,7 +24,8 @@
     "files:import": "tsx scripts/import-legacy-files.ts",
     "db:backup": "node scripts/sync-db-provider.mjs && prisma generate && tsx scripts/backup-cloud.ts",
     "format": "prettier --write",
-    "test:unit": "tsx scripts/test-humanizer.ts && tsx scripts/test-fact-guard.ts"
+    "test:unit": "tsx scripts/test-humanizer.ts && tsx scripts/test-fact-guard.ts && tsx scripts/test-security.ts",
+    "db:assistant": "tsx scripts/setup-assistant-role.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -40,7 +41,7 @@
     "jose": "^5.9.6",
     "jszip": "^3.10.1",
     "lucide-react": "^0.460.0",
-    "next": "^14.2.18",
+    "next": "^14.2.35",
     "nodemailer": "^6.9.16",
     "pdf-lib": "^1.17.1",
     "puppeteer-core": "^25.17.0",
@@ -60,7 +61,7 @@
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.18",
+    "eslint-config-next": "^14.2.35",
     "postcss": "^8.4.49",
     "prettier": "^3.10.1",
     "prisma": "^5.22.0",

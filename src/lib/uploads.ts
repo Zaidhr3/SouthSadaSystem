@@ -4,12 +4,15 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { db } from "./db";
 import { AppError } from "./permissions";
+import { mimeFor } from "./file-types";
 import { consumeStaged, fetchStaged, stagedTokens, validStagedTickets, STAGED_MAX_BYTES } from "./storage";
 
 /** على Vercel حد الطلب الواحد 4.5 ميغابايت؛ محلياً 20 ميغابايت */
 export const MAX_FILE_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB || 20);
 export const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
 const ALLOWED_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".doc", ".docx", ".xls", ".xlsx", ".dwg", ".zip", ".mp3"]);
+
+export { attachmentHeaders, mimeFor } from "./file-types";
 
 export type EntityType =
   | "tender"
@@ -124,7 +127,7 @@ export async function saveAttachments(fd: FormData, entityType: EntityType, enti
         entityId,
         fileName: fixFileName(f.name),
         storedName,
-        mimeType: f.type || "application/octet-stream",
+        mimeType: mimeFor(f.name),
         size: f.size,
         label,
         slot: opts.slot ?? null,
@@ -164,8 +167,8 @@ export async function attachedFileCount(fd: FormData, userId: number, field = "f
 
 /** أنواع الملفات في النموذج (لفحص «صور فقط» مثلاً) */
 export async function attachedFileTypes(fd: FormData, userId: number, field = "files") {
-  const inline = fd.getAll(field).filter((f): f is File => typeof f === "object" && f !== null && "size" in f && (f as File).size > 0).map((f) => f.type);
-  return inline.concat((await validStagedTickets(fd, userId, field)).map((t) => t.mimeType));
+  const inline = fd.getAll(field).filter((f): f is File => typeof f === "object" && f !== null && "size" in f && (f as File).size > 0).map((f) => mimeFor(f.name));
+  return inline.concat((await validStagedTickets(fd, userId, field)).map((t) => mimeFor(t.fileName)));
 }
 
 export async function deleteAttachmentsFor(entityType: EntityType, entityId: number) {

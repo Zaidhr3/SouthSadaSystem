@@ -23,6 +23,8 @@ const nextConfig = {
     },
   },
   poweredByHeader: false,
+  // النظام لا يستخدم next/image — تعطيل مُحسِّن الصور يقلل سطح ثغرات Next.js المعروفة فيه (DoS/RCE في Image Optimization API)
+  images: { unoptimized: true },
   // حد المرفقات في الطلب العادي: Vercel يرفض أي طلب أكبر من 4.5 ميغابايت (حد ثابت للمنصة لا يرفعه bodySizeLimit) — محلياً 20.
   // ما فوقه يُرفع مباشرة من المتصفح إلى Supabase Storage (حتى NEXT_PUBLIC_MAX_STAGED_MB) ويصل للخادم كرمز فقط.
   env: {
