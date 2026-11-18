@@ -8,6 +8,7 @@ import { auditEvent, run, runVoid, type ActionState } from "@/lib/action";
 import { AppError, type Role } from "@/lib/permissions";
 import { ask } from "@/lib/assistant/agent";
 import { importSkill } from "@/lib/assistant/skills";
+import { executeAction } from "@/lib/assistant/actions";
 
 const ALLOWED = (r: Role) => r === "ADMIN" || r === "CHAIRMAN";
 const t = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -100,6 +101,45 @@ export async function deleteSkill(id: number) {
   const r = await runVoid(async () => {
     await actionUser((x) => x === "ADMIN");
     await db.aiSkill.delete({ where: { id } });
+  });
+  revalidatePath("/assistant");
+  return r;
+}
+
+/** تنفيذ إجراء اقترحه المساعد — بعد موافقتك وبصلاحياتك */
+export async function approveAssistantAction(id: number) {
+  const r = await runVoid(async () => {
+    const user = await actionUser((x) => x === "ADMIN");
+    const res = await executeAction(id, user).catch((e) => {
+      throw new AppError(e instanceof Error ? e.message : "تعذر التنفيذ");
+    });
+    await db.assistantMessage.create({ data: { threadId: res.action.threadId, role: "assistant", text: res.ok ? `✅ نُفّذ: ${res.action.summary}\n\n${res.result}` : `⚠️ لم يُنفَّذ: ${res.action.summary}\n\nالسبب: ${res.result}`, model: "system" } });
+    await db.assistantThread.update({ where: { id: res.action.threadId }, data: { updatedAt: new Date() } });
+  });
+  revalidatePath("/assistant");
+  return r;
+}
+
+/** تنفيذ كل الإجراءات المقترحة في المحادثة بالترتيب */
+export async function approveAllAssistantActions(threadId: number) {
+  const r = await runVoid(async () => {
+    const user = await actionUser((x) => x === "ADMIN");
+    const pending = await db.assistantAction.findMany({ where: { threadId, userId: user.id, status: "PROPOSED" }, orderBy: { id: "asc" } });
+    const lines: string[] = [];
+    for (const a of pending) {
+      const res = await executeAction(a.id, user).catch((e) => ({ ok: false, result: e instanceof Error ? e.message : String(e), action: a }));
+      lines.push(`${res.ok ? "✅" : "⚠️"} ${a.summary}${res.ok ? "" : ` — ${res.result}`}`);
+    }
+    if (lines.length) await db.assistantMessage.create({ data: { threadId, role: "assistant", text: `نتيجة التنفيذ:\n${lines.map((l) => `- ${l}`).join("\n")}`, model: "system" } });
+  });
+  revalidatePath("/assistant");
+  return r;
+}
+
+export async function rejectAssistantAction(id: number) {
+  const r = await runVoid(async () => {
+    const user = await actionUser(ALLOWED, { readOnlyOk: true });
+    await db.assistantAction.updateMany({ where: { id, userId: user.id, status: "PROPOSED" }, data: { status: "REJECTED" } });
   });
   revalidatePath("/assistant");
   return r;

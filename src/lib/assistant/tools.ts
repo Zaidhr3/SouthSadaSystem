@@ -11,6 +11,7 @@ import { runIntegrityChecks } from "./integrity";
 import * as labels from "../labels";
 import { QUOTE_STATUS } from "../quotes";
 import { MKT_STATUS } from "../marketing";
+import { propose } from "./actions";
 import { tenderCoords } from "../external/geo";
 import { forecast } from "../external/weather";
 import { jodRates } from "../external/fx";
@@ -21,7 +22,8 @@ import { scrapeUrl, webResearch, webSearch } from "../ai-services";
  * الاستعلام الحر يعمل داخل معاملة READ ONLY على Postgres، ويُمنع من الجداول/الأعمدة الحساسة.
  */
 export type ToolDef = { name: string; description: string; parameters: { type: "object"; properties: Record<string, { type: string; description?: string; enum?: string[] }>; required?: string[] } };
-type Handler = (args: Record<string, unknown>, user: AppUser) => Promise<unknown>;
+export type ToolCtx = { threadId: number };
+type Handler = (args: Record<string, unknown>, user: AppUser, ctx: ToolCtx) => Promise<unknown>;
 
 const FORBIDDEN = /("?IntegrationSecret"?|"?AttachmentBlob"?|passwordHash|"?UploadTicket"?|"?Setting"?\b|pg_shadow|pg_authid|\bauth\.|\bstorage\.|current_setting|dblink|pg_read|pg_ls|lo_import|copy\s)/i;
 
@@ -191,5 +193,37 @@ export const TOOLS: (ToolDef & { run: Handler })[] = [
     },
   },
 ];
+
+
+/** أدوات الاقتراح: كل واحدة تُنشئ إجراءً بانتظار موافقة المستخدم (لا تنفيذ مباشر) */
+const parseJson = (v: unknown) => {
+  if (v && typeof v === "object") return v as Record<string, unknown>;
+  try {
+    return JSON.parse(String(v ?? "{}")) as Record<string, unknown>;
+  } catch {
+    throw new Error("dataJson ليس JSON صالحاً");
+  }
+};
+const P = (name: string, description: string, properties: ToolDef["parameters"]["properties"], required: string[], map: (a: Record<string, unknown>) => [string, Record<string, unknown>]): ToolDef & { run: Handler } => ({
+  name,
+  description: `${description} (اقتراح بانتظار موافقة المستخدم)`,
+  parameters: { type: "object", properties, required },
+  run: async (a, user, ctx) => {
+    const [tool, args] = map(a);
+    return propose(tool, args, { threadId: ctx.threadId, userId: user.id });
+  },
+});
+TOOLS.push(
+  P("propose_update_record", "اقتراح تعديل حقول سجل (اسم، موقع، مدير، تواريخ، ملاحظات، حالة غير مالية...). model اسم الجدول كما في db_schema، dataJson كائن JSON بالحقول الجديدة فقط", { model: { type: "string" }, id: { type: "number" }, dataJson: { type: "string", description: 'مثال: {"managerId": 35, "notes": "..."}' } }, ["model", "id", "dataJson"], (a) => ["update_record", { model: String(a.model), id: Number(a.id), data: parseJson(a.dataJson) }]),
+  P("propose_create_record", "اقتراح إضافة سجل جديد (يومية موقع، بند خطة عمل، مقاول باطن، معدة، وثيقة شركة، مشكلة)", { model: { type: "string" }, dataJson: { type: "string" } }, ["model", "dataJson"], (a) => ["create_record", { model: String(a.model), data: parseJson(a.dataJson) }]),
+  P("propose_assign_quote", "اقتراح إسناد طلب تسعير لمدير مشروع", { quoteId: { type: "number" }, pmId: { type: "number" } }, ["quoteId", "pmId"], (a) => ["assign_quote", { quoteId: Number(a.quoteId), pmId: Number(a.pmId) }]),
+  P("propose_send_message", "اقتراح رسالة داخلية لموظف (مع تنبيه)", { toUserId: { type: "number" }, subject: { type: "string" }, body: { type: "string" }, tenderId: { type: "number" } }, ["toUserId", "subject", "body"], (a) => ["send_message", { toUserId: Number(a.toUserId), subject: String(a.subject), body: String(a.body), tenderId: a.tenderId ? Number(a.tenderId) : null }]),
+  P("propose_notify", "اقتراح تنبيه داخل النظام. targets مفصولة بفاصلة: ADMIN أو ACCOUNTANT أو CHAIRMAN أو PM (كل مدراء المشاريع) أو أرقام مستخدمين", { targets: { type: "string" }, title: { type: "string" }, body: { type: "string" }, href: { type: "string" } }, ["targets", "title"], (a) => ["notify_team", { targets: String(a.targets).split(/[,،\s]+/).filter(Boolean), title: String(a.title), body: String(a.body ?? ""), href: String(a.href ?? "/notifications") }]),
+  P("propose_marketing_idea", "اقتراح صياغة منشور/قصة من فكرة (تدخل مراجعة التسويق)", { idea: { type: "string" }, kind: { type: "string", enum: ["POST", "STORY", "BOTH"] } }, ["idea"], (a) => ["marketing_idea", { idea: String(a.idea), kind: String(a.kind ?? "BOTH") }]),
+  P("propose_design_post", "اقتراح تصميم ذكي لمنشور (صورة من المكتبة أو رسم هندسي)", { itemId: { type: "number" } }, ["itemId"], (a) => ["design_post", { itemId: Number(a.itemId) }]),
+  P("propose_schedule_post", "اقتراح اعتماد منشور مصمم وجدولة نشره على فيسبوك وإنستغرام. publishAt بصيغة ISO", { itemId: { type: "number" }, publishAt: { type: "string" } }, ["itemId", "publishAt"], (a) => ["schedule_post", { itemId: Number(a.itemId), publishAt: String(a.publishAt) }]),
+  P("propose_resolve_issue", "اقتراح إغلاق مشكلة في سجل المشاكل", { id: { type: "number" }, status: { type: "string", enum: ["RESOLVED", "DISMISSED"] } }, ["id"], (a) => ["resolve_issue", { id: Number(a.id), status: String(a.status ?? "RESOLVED") }]),
+  P("propose_refresh_accounts", "اقتراح تحديث وتحليل حسابات فيسبوك وإنستغرام", {}, [], () => ["refresh_accounts", {}]),
+);
 
 export const toolByName = (n: string) => TOOLS.find((t) => t.name === n);

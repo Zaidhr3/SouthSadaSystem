@@ -7,6 +7,7 @@ import { geminiConfigured, geminiModel } from "../ai/gemini";
 import { TOOLS, toolByName } from "./tools";
 import { SYSTEM_KNOWLEDGE } from "./knowledge";
 import { skillsPrompt } from "./skills";
+import { EDIT_GUIDE } from "./actions";
 
 /**
  * مساعد النظام الذكي: وكيل يفهم النظام من الألف إلى الياء ويستخدم الأدوات بنفسه
@@ -23,10 +24,12 @@ async function systemPrompt(user: AppUser) {
   const today = new Date().toLocaleDateString("en-GB", { timeZone: "Asia/Amman" });
   return `${SYSTEM_KNOWLEDGE}
 
+${EDIT_GUIDE}
+
 المستخدم الحالي: ${user.name} (الدور: ${user.role}). تاريخ اليوم (عمّان): ${today}.${await skillsPrompt("assistant")}`;
 }
 
-async function runTool(name: string, args: Record<string, unknown>, user: AppUser, log: ToolLog[]) {
+async function runTool(name: string, args: Record<string, unknown>, user: AppUser, log: ToolLog[], ctx: { threadId: number }) {
   const t = toolByName(name);
   const started = Date.now();
   if (!t) {
@@ -34,7 +37,7 @@ async function runTool(name: string, args: Record<string, unknown>, user: AppUse
     return { error: `أداة غير معروفة: ${name}` };
   }
   try {
-    const out = await t.run(args ?? {}, user);
+    const out = await t.run(args ?? {}, user, ctx);
     log.push({ name, args, ms: Date.now() - started, ok: true });
     const s = JSON.stringify(out);
     // حد حجم النتيجة حتى لا يغرق السياق
@@ -50,7 +53,7 @@ async function runTool(name: string, args: Record<string, unknown>, user: AppUse
 let client: Anthropic | null = null;
 const anthropic = () => (client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000, maxRetries: 1 }));
 
-async function runClaude(system: string, history: Turn[], user: AppUser, log: ToolLog[], started: number) {
+async function runClaude(system: string, history: Turn[], user: AppUser, log: ToolLog[], started: number, ctx: { threadId: number }) {
   const tools = TOOLS.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
   const messages: Anthropic.MessageParam[] = history.map((h) => ({ role: h.role, content: h.text }));
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -66,7 +69,7 @@ async function runClaude(system: string, history: Turn[], user: AppUser, log: To
     const calls = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     if (res.stop_reason !== "tool_use" || !calls.length || Date.now() - started > BUDGET_MS) return { text: text || "لم أصل لإجابة — أعد صياغة السؤال.", model: res.model };
-    const results = await Promise.all(calls.map(async (c) => ({ type: "tool_result" as const, tool_use_id: c.id, content: JSON.stringify(await runTool(c.name, c.input as Record<string, unknown>, user, log)) })));
+    const results = await Promise.all(calls.map(async (c) => ({ type: "tool_result" as const, tool_use_id: c.id, content: JSON.stringify(await runTool(c.name, c.input as Record<string, unknown>, user, log, ctx)) })));
     messages.push({ role: "user", content: results });
   }
   return { text: "توقفت بعد عدد كبير من الخطوات — جزّئ الطلب.", model: CLAUDE_MODEL() };
@@ -76,7 +79,7 @@ async function runClaude(system: string, history: Turn[], user: AppUser, log: To
 type GPart = { text?: string; functionCall?: { name: string; args?: Record<string, unknown> }; functionResponse?: { name: string; response: unknown }; thoughtSignature?: string; thought?: boolean };
 type GContent = { role: "user" | "model"; parts: GPart[] };
 
-async function runGemini(system: string, history: Turn[], user: AppUser, log: ToolLog[], started: number) {
+async function runGemini(system: string, history: Turn[], user: AppUser, log: ToolLog[], started: number, ctx: { threadId: number }) {
   const model = process.env.ASSISTANT_GEMINI_MODEL || geminiModel();
   const decls = TOOLS.map((t) => ({ name: t.name, description: t.description, ...(Object.keys(t.parameters.properties).length ? { parameters: t.parameters } : {}) }));
   const contents: GContent[] = history.map((h) => ({ role: h.role === "user" ? "user" : "model", parts: [{ text: h.text }] }));
@@ -98,7 +101,7 @@ async function runGemini(system: string, history: Turn[], user: AppUser, log: To
     const calls = content.parts.filter((p) => p.functionCall);
     const text = content.parts.filter((p) => p.text && !p.thought).map((p) => p.text).join("").trim();
     if (!calls.length || Date.now() - started > BUDGET_MS) return { text: text || "لم أصل لإجابة — أعد صياغة السؤال.", model };
-    const responses = await Promise.all(calls.map(async (c) => ({ functionResponse: { name: c.functionCall!.name, response: { result: await runTool(c.functionCall!.name, c.functionCall!.args ?? {}, user, log) } } })));
+    const responses = await Promise.all(calls.map(async (c) => ({ functionResponse: { name: c.functionCall!.name, response: { result: await runTool(c.functionCall!.name, c.functionCall!.args ?? {}, user, log, ctx) } } })));
     contents.push({ role: "user", parts: responses });
   }
   return { text: "توقفت بعد عدد كبير من الخطوات — جزّئ الطلب.", model };
@@ -116,11 +119,13 @@ export async function ask(threadId: number, message: string, user: AppUser) {
   const log: ToolLog[] = [];
   let out: { text: string; model: string };
   try {
-    out = claudeConfigured() ? await runClaude(system, history, user, log, started) : await runGemini(system, history, user, log, started);
+    out = claudeConfigured() ? await runClaude(system, history, user, log, started, { threadId }) : await runGemini(system, history, user, log, started, { threadId });
   } catch (e) {
     out = { text: `تعذر الوصول للمساعد الآن: ${e instanceof Error ? e.message : e}`, model: "error" };
   }
   const msg = await db.assistantMessage.create({ data: { threadId, role: "assistant", text: out.text, tools: log, model: out.model } });
+  // ربط الاقتراحات الجديدة بهذه الرسالة (تُعرض تحتها بأزرار التنفيذ)
+  await db.assistantAction.updateMany({ where: { threadId, messageId: null }, data: { messageId: msg.id } });
   await db.assistantThread.update({ where: { id: threadId }, data: { updatedAt: new Date() } });
   return msg;
 }

@@ -1312,3 +1312,22 @@ model AdBoost {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
+
+/// إجراءات يقترحها المساعد الذكي — لا تُنفَّذ إلا بموافقة المستخدم وبصلاحياته (المالية والحساسة ممنوعة عليه)
+model AssistantAction {
+  id          Int       @id @default(autoincrement())
+  threadId    Int
+  messageId   Int?
+  userId      Int
+  tool        String
+  args        Json
+  /// وصف الإجراء بالعربية كما سيُعرض للموافقة
+  summary     String
+  /// PROPOSED | EXECUTED | REJECTED | FAILED
+  status      String    @default("PROPOSED")
+  result      String?
+  executedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([threadId, status])
+}

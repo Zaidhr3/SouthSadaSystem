@@ -8,7 +8,7 @@ import { assistantEngine, type ToolLog } from "@/lib/assistant/agent";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { ActionForm, ConfirmButton, Input, Select, Textarea } from "@/components/forms";
 import { Markdown } from "@/components/markdown";
-import { askAssistant, deleteSkill, deleteThread, fullCheckup, importSkillAction, setIssueStatus, toggleSkill } from "../actions/assistant";
+import { approveAllAssistantActions, approveAssistantAction, askAssistant, deleteSkill, deleteThread, fullCheckup, importSkillAction, rejectAssistantAction, setIssueStatus, toggleSkill } from "../actions/assistant";
 
 export const metadata = { title: "المساعد الذكي" };
 /** الوكيل قد يستخدم عدة أدوات متتالية */
@@ -52,6 +52,8 @@ export default async function AssistantPage({ searchParams }: { searchParams: { 
     tab === "skills" ? db.aiSkill.findMany({ orderBy: { name: "asc" } }) : [],
     db.systemIssue.count({ where: { status: "OPEN" } }),
   ]);
+  const actions = thread ? await db.assistantAction.findMany({ where: { threadId: thread.id }, orderBy: { id: "asc" } }) : [];
+  const pendingCount = actions.filter((a) => a.status === "PROPOSED").length;
   const engine = assistantEngine();
   return (
     <>
@@ -124,16 +126,41 @@ export default async function AssistantPage({ searchParams }: { searchParams: { 
                         </details>
                       )}
                       <Markdown text={m.text} />
+                      {actions.filter((a) => a.messageId === m.id).length > 0 && (
+                        <ul className="mt-3 space-y-2 border-t border-line pt-3">
+                          {actions.filter((a) => a.messageId === m.id).map((a) => (
+                            <li key={a.id} className={clsx("rounded-xl border p-2.5", a.status === "PROPOSED" ? "border-accent/40 bg-accent-soft/40" : a.status === "EXECUTED" ? "border-good/30 bg-good-soft/50" : "border-line bg-black/[0.03]")}>
+                              <p className="text-[13px] font-semibold leading-6">
+                                <span className="me-1">{a.status === "PROPOSED" ? "⏳" : a.status === "EXECUTED" ? "✅" : a.status === "REJECTED" ? "✖" : a.status === "EXECUTING" ? "⚙️" : "⚠️"}</span>
+                                {a.summary}
+                              </p>
+                              {a.result && a.status !== "PROPOSED" && <p className="mt-0.5 text-xs text-ink-muted">{a.result}</p>}
+                              {a.status === "PROPOSED" && admin && (
+                                <div className="mt-2 flex gap-2">
+                                  <ConfirmButton action={approveAssistantAction.bind(null, a.id)} confirm={`تنفيذ: ${a.summary}؟`} className="btn-primary btn-sm">نفّذ</ConfirmButton>
+                                  <ConfirmButton action={rejectAssistantAction.bind(null, a.id)} confirm="إلغاء هذا الإجراء؟" className="btn-ghost btn-sm">لا</ConfirmButton>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </>
                   )}
                 </div>
               </div>
             ))}
+            {thread && pendingCount > 1 && admin && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-accent/40 bg-accent-soft/50 px-4 py-3">
+                <p className="text-sm font-bold text-accent">{pendingCount} إجراءات مقترحة بانتظار موافقتك</p>
+                <ConfirmButton action={approveAllAssistantActions.bind(null, thread.id)} confirm={`تنفيذ كل الإجراءات (${pendingCount}) بالترتيب؟`} className="btn-primary btn-sm">نفّذ الكل</ConfirmButton>
+              </div>
+            )}
             <Card>
               <ActionForm action={askAssistant.bind(null, thread?.id ?? null)} submitLabel="إرسال" resetOnSuccess>
                 <Textarea name="message" label={thread ? "تابع المحادثة" : "سؤالك"} rows={3} required placeholder="مثال: ليش المطالبة رقم 2 متأخرة؟ وشو لازم أعمل؟" />
               </ActionForm>
-              <p className="mt-2 text-xs text-ink-faint">المساعد يقرأ ويحلل فقط — لا يعدّل البيانات. الأسرار وكلمات المرور محمية عنه.</p>
+              <p className="mt-2 text-xs text-ink-faint">المساعد يفهم المهمة ويقترح الخطة، ولا ينفّذ شيئاً إلا بعد ضغطك «نفّذ» — وبصلاحياتك. المالية (البنك، الشيكات، القروض، المصاريف، التمويل، الضريبة، الفوترة، المطالبات، الكفالات) والمستخدمون والأسرار والحذف: يدوي فقط.</p>
             </Card>
           </div>
         </div>
