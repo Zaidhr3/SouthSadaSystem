@@ -7,25 +7,14 @@ import { db } from "@/lib/db";
 import { actionUser, assertTenderAccess } from "@/lib/auth";
 import { run, runVoid, type ActionState } from "@/lib/action";
 import { AppError, can } from "@/lib/permissions";
-import { appUrl, emailLayout, mailConfigured, sendMail } from "@/lib/mailer";
 import { saveAttachments, validateAttachments } from "@/lib/uploads";
-import { checkSignature, documentHash, tempPassword } from "@/lib/portal";
+import { checkSignature, documentHash, mailClientCredentials, tempPassword } from "@/lib/portal";
 
 const t = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const done = (tenderId: number) => revalidatePath(`/tenders/${tenderId}/portal`);
 const ip = () => (headers().get("x-forwarded-for") || "").split(",")[0].trim() || null;
 
-async function mailCredentials(to: string, name: string, password: string, project: string) {
-  if (!mailConfigured()) return false;
-  const url = `${appUrl().replace(/\/+$/, "")}/portal/login`;
-  await sendMail({
-    key: `client-cred:${to}:${Date.now()}`,
-    to,
-    subject: "حسابك في بوابة عملاء صدى الجنوب للمقاولات",
-    html: emailLayout("بوابة العملاء", [{ title: `مرحباً ${name}`, body: `أُنشئ لك حساب لمتابعة مشروع «${project}»: نسبة الإنجاز، خطة العمل، اليوميات، المراسلات والتواقيع.<br><br>البريد: <b dir="ltr">${to}</b><br>كلمة المرور المؤقتة: <b dir="ltr">${password}</b><br><br>ستُطلب منك كلمة مرور جديدة عند أول دخول.`, href: url, tone: "info" }]),
-  }).catch(() => undefined);
-  return true;
-}
+const mailCredentials = mailClientCredentials;
 
 /** الإدارة: إنشاء حساب عميل (أو ربط حساب موجود بنفس البريد) بالمشروع */
 export async function addClient(tenderId: number, _: ActionState, fd: FormData): Promise<ActionState> {

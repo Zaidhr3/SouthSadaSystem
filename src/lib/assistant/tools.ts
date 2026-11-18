@@ -11,6 +11,9 @@ import { runIntegrityChecks } from "./integrity";
 import * as labels from "../labels";
 import { QUOTE_STATUS } from "../quotes";
 import { MKT_STATUS } from "../marketing";
+import { tenderCoords } from "../external/geo";
+import { forecast } from "../external/weather";
+import { jodRates } from "../external/fx";
 
 /**
  * أدوات مساعد النظام — قراءة فقط (عدا تسجيل مشكلة في سجل المشاكل).
@@ -120,6 +123,24 @@ export const TOOLS: (ToolDef & { run: Handler })[] = [
       ]);
       return json({ audit, mailFailures: mailFail, marketingFailures: mktFail });
     },
+  },
+  {
+    name: "site_weather",
+    description: "طقس مواقع المشاريع النشطة لثلاثة أيام (MET Norway) مع تنبيهات العمل: مطر يؤجل الصب، رياح توقف الرافعات، حر أو برد يؤثر على الخرسانة. tenderId اختياري لمشروع واحد.",
+    parameters: { type: "object", properties: { tenderId: { type: "number", description: "رقم المشروع (اختياري)" } } },
+    run: async (a) => {
+      const ts = await db.tender.findMany({ where: a.tenderId ? { id: Number(a.tenderId) } : { status: { in: ["WON", "EXECUTION"] }, archiveStage: 0 }, select: { id: true, name: true, location: true, lat: true, lon: true }, take: 10 });
+      return Promise.all(ts.map(async (t) => {
+        const c = await tenderCoords(t).catch(() => null);
+        return { id: t.id, name: t.name, location: t.location, forecast: c ? await forecast(c.lat, c.lon, 3).catch((e: unknown) => ({ error: String(e) })) : "الموقع غير محدد" };
+      }));
+    },
+  },
+  {
+    name: "exchange_rates",
+    description: "أسعار صرف الدينار الأردني الحالية (دولار، يورو، درهم، ريال، جنيه، ليرة تركية، يوان) — لتسعير المواد المستوردة وعروض الموردين.",
+    parameters: { type: "object", properties: {} },
+    run: async () => (await jodRates()) ?? { error: "تعذر جلب الأسعار الآن" },
   },
   {
     name: "list_issues",

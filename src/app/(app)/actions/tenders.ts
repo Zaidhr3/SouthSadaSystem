@@ -1,11 +1,12 @@
 "use server";
 
+import { provisionClient } from "@/lib/portal";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { actionUser, assertTenderAccess } from "@/lib/auth";
-import { run, runVoid, type ActionState } from "@/lib/action";
+import { auditEvent, run, runVoid, type ActionState } from "@/lib/action";
 import { AppError, can } from "@/lib/permissions";
 import { createCompanyExpense, removeLinkedBankTx } from "@/lib/finance";
 import { deleteAttachmentsFor, saveAttachments, validateAttachments } from "@/lib/uploads";
@@ -153,6 +154,35 @@ export async function createTender(_: ActionState, fd: FormData): Promise<Action
       throw e instanceof AppError ? e : new AppError("تعذر حفظ المرفقات — لم يُسجَّل العطاء. أعد المحاولة");
     }
     newId = tender.id;
+    // مشروع خاص من طلب الموقع: ربط الطلب ونقل دراسته ومرفقاته إلى المشروع
+    const quoteId = Number(raw.quoteId) || 0;
+    if (quoteId && tender.kind === "PRIVATE") {
+      const q = await db.quoteRequest.findUnique({ where: { id: quoteId }, select: { id: true, tenderId: true, status: true } });
+      if (q && !q.tenderId) {
+        await db.quoteRequest.update({ where: { id: q.id }, data: { tenderId: tender.id, ...(q.status === "ADMIN_REVIEW" ? { status: "APPROVED", decidedAt: new Date() } : {}) } });
+        await db.attachment.updateMany({ where: { entityType: "quote", entityId: q.id }, data: { entityType: "tender", entityId: tender.id } });
+        await db.quoteEvent.create({ data: { quoteId: q.id, action: "PROJECT", note: `فُتح مشروع خاص: ${tender.name}`, userId: user.id, userName: user.name } }).catch(() => undefined);
+      }
+    }
+    // حساب صاحب المشروع في بوابة العملاء (الدخول بالبريد + كلمة السر)
+    const clientEmail = String(raw.clientEmail ?? "").trim();
+    if (tender.kind === "PRIVATE" && clientEmail) {
+      const c = await provisionClient({
+        tenderId: tender.id,
+        projectName: tender.name,
+        name: String(raw.clientName ?? "").trim() || tender.entity,
+        email: clientEmail,
+        phone: String(raw.clientPhone ?? "").trim() || null,
+        password: String(raw.clientPassword ?? "").trim() || null,
+        createdById: user.id,
+        sendEmail: raw.clientSendEmail === "on",
+      }).catch(async (e) => {
+        // المشروع أُنشئ: فشل الحساب لا يلغيه — يُضاف الحساب لاحقاً من «بوابة العميل»
+        await notify([user.id], { title: "تعذر إنشاء حساب صاحب المشروع", body: `${tender.name}: ${e instanceof Error ? e.message : e} — أضفه من صفحة بوابة العميل`, href: `/tenders/${tender.id}/portal` });
+        return null;
+      });
+      if (c) await auditEvent("CREATE", "Client", `حساب بوابة لصاحب المشروع ${clientEmail}${c.existing ? " (حساب موجود رُبط بالمشروع)" : c.mailed ? " — أُرسلت بيانات الدخول بالبريد" : ""}`, user, { recordId: tender.id });
+    }
     if (data.managerId) {
       await notify([data.managerId], { title: awarded ? "تم إسناد مشروع إليك" : "تم إسناد عطاء جديد إليك", body: awarded ? tender.name : `${tender.name} — آخر موعد للتقديم ${fmtDate(tender.deadline)}`, href: `/tenders/${tender.id}` }, { exclude: user.id });
     }

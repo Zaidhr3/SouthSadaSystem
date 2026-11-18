@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { actionUser } from "@/lib/auth";
 import { run, type ActionState } from "@/lib/action";
@@ -79,6 +80,7 @@ export async function accountantQuote(id: number, decision: "accept" | "return",
 
 /** الإدارة: اعتماد نهائي (مع إنشاء مشروع خاص اختيارياً) أو رفض */
 export async function adminQuote(id: number, decision: "approve" | "reject", _: ActionState, fd: FormData): Promise<ActionState> {
+  let approvedOpen = false;
   const r = await run(async () => {
     const user = await actionUser(can.approveQuotes);
     const q = await load(id);
@@ -91,36 +93,15 @@ export async function adminQuote(id: number, decision: "approve" | "reject", _: 
       if (q.assignedPmId) await notify([q.assignedPmId], { title: `رُفض طلب التسعير ${q.ref}`, body: note, href: `/quotes/${id}` });
       return "رُفض الطلب";
     }
-    let tenderId: number | null = null;
-    if (fd.get("createProject") === "on") {
-      const today = todayUTC();
-      const t = await db.tender.create({
-        data: {
-          kind: "PRIVATE",
-          name: `${q.projectType} — ${q.name}`.slice(0, 200),
-          number: q.ref,
-          entity: q.name,
-          location: q.city,
-          classification: q.projectType,
-          status: "SUBMITTED",
-          purchaseDate: today,
-          deadline: today,
-          docFee: 0,
-          bidAmount: q.pmPrice,
-          managerId: q.assignedPmId,
-          notes: `من طلب الموقع ${q.ref}\nالهاتف: ${q.phone}\n${q.details}${q.pmNotes ? `\n\nدراسة مدير المشروع:\n${q.pmNotes}` : ""}`,
-        },
-      });
-      tenderId = t.id;
-      // نقل مرفقات الدراسة للمشروع الجديد
-      await db.attachment.updateMany({ where: { entityType: "quote", entityId: id }, data: { entityType: "tender", entityId: t.id } });
-    }
-    await db.quoteRequest.update({ where: { id }, data: { status: "APPROVED", adminNotes: note || null, decidedAt: new Date(), tenderId } });
-    await log(id, user, "APPROVED", tenderId ? `${note ? note + " — " : ""}أُنشئ مشروع خاص` : note);
-    if (q.assignedPmId) await notify([q.assignedPmId], { title: `اعتُمد عرض السعر ${q.ref}`, body: `${q.projectType} — ${q.name}. تواصل مع العميل على ${q.phone}`, href: tenderId ? `/tenders/${tenderId}` : `/quotes/${id}` });
-    return tenderId ? "اعتُمد العرض وأُنشئ مشروع خاص" : "اعتُمد العرض";
+    await db.quoteRequest.update({ where: { id }, data: { status: "APPROVED", adminNotes: note || null, decidedAt: new Date() } });
+    await log(id, user, "APPROVED", note);
+    if (q.assignedPmId) await notify([q.assignedPmId], { title: `اعتُمد عرض السعر ${q.ref}`, body: `${q.projectType} — ${q.name}: يُفتح له مشروع خاص وحساب في بوابة العملاء`, href: `/quotes/${id}` });
+    approvedOpen = fd.get("openProject") !== "off";
+    return "اعتُمد العرض";
   });
   done(id);
+  // الرد على الطالب = فتح مشروع خاص له بحساب في البوابة (بدل الرد على الهاتف/البريد)
+  if (r.ok && approvedOpen) redirect(`/tenders/new?kind=PRIVATE&quote=${id}`);
   return r;
 }
 

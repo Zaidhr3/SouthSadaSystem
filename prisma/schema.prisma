@@ -52,6 +52,9 @@ model Tender {
   number                  String
   entity                  String
   location                String?
+  /// إحداثيات الموقع (تُحدَّد تلقائياً من اسم الموقع) — لطقس الموقع وتنبيهات الصب والرافعات
+  lat                     Float?
+  lon                     Float?
   classification          String?
   status                  String    @default("PURCHASED")
   purchaseDate            DateTime

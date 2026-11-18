@@ -40,7 +40,8 @@ export default async function TendersPage({ searchParams }: { searchParams: { vi
   const tenders = await db.tender.findMany({
     where,
     include: { manager: { select: { name: true } }, _count: { select: { boqItems: true } }, guarantees: { select: { type: true, status: true, expiryDate: true } }, claims: { select: { type: true, status: true } } },
-    orderBy: [{ deadline: "desc" }],
+    // الأحدث إضافةً أولاً (عطاء/مشروع جديد يظهر في رأس القائمة)
+    orderBy: [{ id: "desc" }],
     take: 300,
   });
 
@@ -94,7 +95,7 @@ export default async function TendersPage({ searchParams }: { searchParams: { vi
                   <Link href={`/tenders/${t.id}`} className="pressable block px-4 py-3.5">
                     <span className="flex items-start justify-between gap-3">
                       <span className="min-w-0">
-                        <span className="block font-bold leading-snug text-ink">{t.name}</span>
+                        <span className="block font-bold leading-snug text-ink">{t.name}{Date.now() - +t.createdAt < 3 * 86400_000 && <span className="ms-1.5 inline-block rounded-full bg-accent px-2 py-0.5 align-middle text-[10px] font-black text-white">جديد</span>}</span>
                         <span className="mt-0.5 block truncate text-xs text-ink-muted">{t.entity} — {t.number}</span>
                       </span>
                       <StatusBadge map={TENDER_STATUS} value={t.status} />{t.archiveStage > 0 && <Badge tone={ARCHIVE_STAGE[t.archiveStage].tone} className="ms-1">{ARCHIVE_STAGE[t.archiveStage].label}</Badge>}{t.kind === "PRIVATE" && <Badge tone="orange" className="ms-1">خاص</Badge>}
@@ -141,6 +142,7 @@ export default async function TendersPage({ searchParams }: { searchParams: { vi
                       <td className="max-w-[320px]">
                         <Link href={`/tenders/${t.id}`} className="block font-bold text-ink hover:text-accent">
                           {t.name}
+                          {Date.now() - +t.createdAt < 3 * 86400_000 && <span className="ms-1.5 inline-block rounded-full bg-accent px-2 py-0.5 align-middle text-[10px] font-black text-white">جديد</span>}
                         </Link>
                         <span className="text-xs text-ink-muted">
                           {t.number} — {t.location ?? ""} {t._count.boqItems > 0 && `— ${t._count.boqItems} بند`}

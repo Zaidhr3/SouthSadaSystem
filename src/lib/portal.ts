@@ -46,3 +46,52 @@ export function planProgress(items: { weight: number; progress: number }[]) {
   const w = items.reduce((s, i) => s + i.weight, 0);
   return w > 0 ? Math.round(items.reduce((s, i) => s + i.weight * i.progress, 0) / w) : null;
 }
+
+/** إرسال بيانات دخول بوابة العملاء بالبريد (الدخول بالبريد الإلكتروني + كلمة المرور، وتُطلب كلمة جديدة عند أول دخول) */
+export async function mailClientCredentials(to: string, name: string, password: string, project: string) {
+  const { appUrl, emailLayout, mailConfigured, sendMail } = await import("./mailer");
+  if (!mailConfigured()) return false;
+  const url = `${appUrl().replace(/\/+$/, "")}/portal/login`;
+  try {
+    await sendMail({
+      key: `client-cred:${to}:${Date.now()}`,
+      to,
+      subject: "حسابك في بوابة عملاء صدى الجنوب للمقاولات",
+      html: emailLayout("بوابة العملاء", [
+        {
+          title: `مرحباً ${name}`,
+          body: `أُنشئ لك حساب لمتابعة مشروع «${project}»: مراحل التنفيذ ونسبة الإنجاز، خطة العمل، يوميات الموقع، المراسلات والتواقيع.<br><br>اسم الدخول (بريدك): <b dir="ltr">${to}</b><br>كلمة المرور: <b dir="ltr">${password}</b><br><br>ستُطلب منك كلمة مرور جديدة عند أول دخول.`,
+          href: url,
+          tone: "info",
+        },
+      ]),
+      text: `حسابك في بوابة عملاء صدى الجنوب\nالبريد: ${to}\nكلمة المرور: ${password}\n${url}`,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * حساب صاحب المشروع في البوابة: ينشئ الحساب (أو يربط حساباً موجوداً بنفس البريد) بالمشروع،
+ * بكلمة المرور التي حددتها الإدارة (أو مؤقتة)، ويرسل بيانات الدخول لبريده.
+ */
+export async function provisionClient(opts: { tenderId: number; projectName: string; name: string; email: string; phone?: string | null; password?: string | null; kind?: "OWNER" | "SUPERVISOR"; createdById: number; sendEmail?: boolean }) {
+  const bcrypt = (await import("bcryptjs")).default;
+  const email = opts.email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AppError("بريد صاحب المشروع غير صالح — الدخول للبوابة يكون بالبريد الإلكتروني");
+  const existing = await db.client.findUnique({ where: { email } });
+  if (existing) {
+    await db.clientAccess.upsert({ where: { clientId_tenderId: { clientId: existing.id, tenderId: opts.tenderId } }, create: { clientId: existing.id, tenderId: opts.tenderId }, update: {} });
+    return { existing: true, password: null as string | null, mailed: false };
+  }
+  if (opts.name.trim().length < 3) throw new AppError("اكتب اسم صاحب المشروع");
+  const password = opts.password?.trim() || tempPassword();
+  if (password.length < 8) throw new AppError("كلمة سر صاحب المشروع 8 أحرف على الأقل");
+  await db.client.create({
+    data: { name: opts.name.trim(), email, phone: opts.phone?.trim() || null, kind: opts.kind ?? "OWNER", passwordHash: await bcrypt.hash(password, 10), mustChangePassword: true, createdById: opts.createdById, accesses: { create: { tenderId: opts.tenderId } } },
+  });
+  const mailed = opts.sendEmail === false ? false : await mailClientCredentials(email, opts.name.trim(), password, opts.projectName);
+  return { existing: false, password, mailed };
+}

@@ -14,6 +14,7 @@ import {
   Trophy,
   Wallet,
   XCircle,
+  Printer,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -32,6 +33,8 @@ import { claimNet } from "@/lib/deductions";
 import { projectCashFlow } from "@/lib/cashflow";
 import { loanSummary } from "@/lib/loans";
 import { ChairmanDashboard } from "./chairman-dashboard";
+import { Suspense } from "react";
+import { FxRates, SiteWeather } from "@/components/site-conditions";
 
 export const dynamic = "force-dynamic";
 
@@ -249,6 +252,12 @@ async function ManagementDashboard({ user }: { user: AppUser }) {
         <StatCard label="الكفالات السارية" value={<Money value={guaranteesAgg._sum.amount ?? 0} />} sub={`${guaranteesAgg._count} كفالات لدى الجهات`} icon={ShieldCheck} tone="purple" href="/guarantees" />
       </div>
 
+      {/* ظروف المواقع: الطقس وتنبيهات الصب والرافعات + أسعار الصرف (تُحمّل دون إبطاء اللوحة) */}
+      <div className="mb-5 grid gap-5 xl:grid-cols-3">
+        <div className="xl:col-span-2"><Suspense fallback={null}><SiteWeather /></Suspense></div>
+        <Suspense fallback={null}><FxRates /></Suspense>
+      </div>
+
       <div className="stagger mb-5 grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2" title={isAdmin ? "التدفق النقدي الشهري" : "المقبوضات مقابل المصاريف"} action={<span className="text-xs text-ink-muted">آخر 12 شهراً</span>}>
           <CashFlowChart data={flow} inLabel={isAdmin ? "الوارد للبنك" : "مطالبات مقبوضة"} outLabel={isAdmin ? "الصادر من البنك" : "مصاريف"} />
@@ -440,12 +449,35 @@ async function PMDashboard({ user }: { user: AppUser }) {
     orderBy: [{ readyAt: "desc" }, { id: "desc" }],
     take: 6,
   });
+  // الكتب الرسمية المعتمدة حديثاً لمشاريعه أو التي أنشأها — جاهزة للطباعة على ورقة الشركة
+  const readyLetters = await db.correspondence.findMany({
+    where: { direction: "OUT", letterStatus: "APPROVED", approvedAt: { gte: new Date(Date.now() - 30 * 86400_000) }, OR: [{ createdById: user.id }, { tender: { managerId: user.id } }] },
+    select: { id: true, refNo: true, subject: true, approvedAt: true, tender: { select: { name: true } } },
+    orderBy: { approvedAt: "desc" },
+    take: 6,
+  });
   const c = custody.get(user.id) ?? { funded: 0, spent: 0, balance: 0 };
   const spentByProject = await db.expense.groupBy({ by: ["tenderId"], where: { tenderId: { in: projects.map((p) => p.id) } }, _sum: { amount: true } });
 
   return (
     <>
       <PageHeader title={`${greeting()}، ${user.name.split(" ").slice(0, 2).join(" ")}`} subtitle="مشاريعك وعهدتك في مكان واحد" />
+      <div className="mb-5"><Suspense fallback={null}><SiteWeather managerId={user.id} /></Suspense></div>
+      {readyLetters.length > 0 && (
+        <Card className="mb-5" title={<span className="flex items-center gap-2"><Printer className="h-5 w-5 text-accent" /> كتب رسمية معتمدة — جاهزة للطباعة</span>}>
+          <ul className="divide-y divide-line">
+            {readyLetters.map((l) => (
+              <li key={l.id} className="flex flex-wrap items-center gap-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <Link href={`/correspondence/letters/${l.id}`} className="font-bold text-ink hover:text-accent">{l.subject}</Link>
+                  <p className="text-xs text-ink-muted"><span dir="ltr" className="num">{l.refNo}</span>{l.tender ? ` — ${l.tender.name}` : ""}{l.approvedAt ? ` · اعتُمد ${fmtDate(l.approvedAt)}` : ""}</p>
+                </div>
+                <a href={`/api/letters/${l.id}/pdf`} target="_blank" rel="noopener" className="btn-primary btn-sm"><Printer className="h-4 w-4" /> طباعة</a>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <LiveAlerts notes={notes} limit={3} />
 

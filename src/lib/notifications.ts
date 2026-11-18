@@ -546,7 +546,10 @@ export async function computeNotifications(user: AppUser, opts: { includeDismiss
     .map((n) => ({ ...n, dismissed: dismissed.has(n.key) }))
     .filter((n) => opts.includeDismissed || !n.dismissed)
     .sort((a, b) => order[a.severity] - order[b.severity] || a.date.localeCompare(b.date));
-  return [...computed, ...eventItems];
+  // الأحداث الجديدة (اعتماد كتاب، إسناد مشروع، طلب جديد...) في رأس القائمة — الأحدث أولاً، ثم الاستحقاقات حسب الخطورة
+  const freshEvents = eventItems.filter((e) => !e.dismissed).sort((a, b) => b.date.localeCompare(a.date));
+  const seenEvents = eventItems.filter((e) => e.dismissed).sort((a, b) => b.date.localeCompare(a.date));
+  return [...freshEvents, ...computed, ...seenEvents];
 }
 
 /**

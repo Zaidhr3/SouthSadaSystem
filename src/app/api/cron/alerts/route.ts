@@ -11,6 +11,7 @@ import { checkMeta, metaConfigured } from "@/lib/meta";
 import { analyzeSocial, syncSocial } from "@/lib/social";
 import { runIntegrityChecks } from "@/lib/assistant/integrity";
 import { db } from "@/lib/db";
+import { weatherAlerts } from "@/lib/external/weather";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -40,6 +41,8 @@ export async function GET(req: Request) {
   // مركز الحسابات: تحديث الأرقام وحكم المحلل يومياً
   const social = meta.ok ? await syncSocial().then(async (s) => ({ ...s, accounts: undefined, analyzed: writerConfigured() ? (await analyzeSocial()).analyzed : 0 })).catch((e) => ({ error: e instanceof Error ? e.message : "error" })) : { skipped: true };
   const marketing = writerConfigured() ? await suggestWeek(null, new Date().getUTCDay() === 6 ? "AI_WEEKLY" : "AI_DAILY").then((x) => x.length).catch((e) => ({ error: e instanceof Error ? e.message : "error" })) : 0;
+  // طقس مواقع المشاريع: تحذيرات بكرة لمدير كل مشروع (MET Norway)
+  const weather = await weatherAlerts().catch((e) => ({ error: e instanceof Error ? e.message : "error" }));
   // فحص السلامة اليومي: كل فحص فاشل يُسجَّل في سجل المشاكل (مرة واحدة حتى يُحل)
   const health = await runIntegrityChecks()
     .then(async (r) => {
@@ -57,7 +60,7 @@ export async function GET(req: Request) {
     const result = await runAlertJob();
     // تنظيف منطقة عبور الرفع المباشر (ملفات رُفعت ولم يُحفظ نموذجها)
     const staging = await cleanupStaging().catch((e) => ({ removed: 0, error: e instanceof Error ? e.message : "error" }));
-    return NextResponse.json({ ok: true, ...result, staging, backup, archives, marketing, meta, scheduled, social, health, at: new Date().toISOString() });
+    return NextResponse.json({ ok: true, ...result, staging, backup, archives, marketing, meta, scheduled, social, health, weather, at: new Date().toISOString() });
   } catch (e) {
     console.error("[cron/alerts]", e);
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "error", backup }, { status: 500 });

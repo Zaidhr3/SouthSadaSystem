@@ -24,7 +24,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: { sta
   const archive = searchParams.view === "archive";
   const view = archive ? { archivedAt: { not: null } } : { archivedAt: null };
   const [rows, all] = await Promise.all([
-    db.claim.findMany({ where: { ...scope, ...view, ...(status ? { status } : {}) }, include: { tender: { select: { id: true, name: true, number: true } }, lines: true }, orderBy: [{ submittedDate: "desc" }, { number: "desc" }] }),
+    db.claim.findMany({ where: { ...scope, ...view, ...(status ? { status } : {}) }, include: { tender: { select: { id: true, name: true, number: true } }, lines: true }, orderBy: [{ id: "desc" }] }), // الأحدث إضافةً أولاً
     db.claim.findMany({ where: scope, select: { status: true, grossAmount: true, retention: true, withholdingTax: true, stampDuty: true, advanceRecovery: true, deductions: true, paidAmount: true, submittedDate: true, paidDate: true } }),
   ]);
   const atts = await attachmentsMap("claim", rows.map((r) => r.id));

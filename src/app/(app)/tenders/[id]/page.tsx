@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { SiteWeather } from "@/components/site-conditions";
 import { OfficialLetterForm } from "@/components/letters";
 import { userSees } from "@/lib/brand";
 import { notFound } from "next/navigation";
@@ -229,6 +231,9 @@ export default async function TenderPage({ params, searchParams }: { params: { i
         isAdmin={user.baseRole === "ADMIN"}
       />
       {tender.archiveStage === 2 && <p className="mb-5 rounded-2xl bg-ink px-4 py-2.5 text-sm font-bold text-white">🔒 هذا المشروع في الأرشيف النهائي — للاطلاع فقط.</p>}
+      {["WON", "EXECUTION"].includes(tender.status) && tender.archiveStage === 0 && (
+        <div className="mb-5"><Suspense fallback={null}><SiteWeather tenderId={tender.id} /></Suspense></div>
+      )}
       {/* بطاقة الحالة: أين المشروع الآن + أزرار سريعة */}
       <section className="card card-pad mb-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

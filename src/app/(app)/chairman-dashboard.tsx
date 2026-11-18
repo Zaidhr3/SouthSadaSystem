@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { SiteWeather } from "@/components/site-conditions";
 import Link from "next/link";
 import clsx from "clsx";
 import {
@@ -100,6 +102,7 @@ export async function ChairmanDashboard({ user }: { user: AppUser }) {
         <h1 className="text-[32px] font-bold leading-tight sm:text-[38px]">{firstName}</h1>
         <p className="mt-1 text-[17px] font-semibold text-ink-soft">صورة كاملة عن الشركة — اضغط أي بطاقة لعرض التفاصيل</p>
       </header>
+      <div className="mb-6"><Suspense fallback={null}><SiteWeather compact /></Suspense></div>
 
       <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Tile href="/bank" icon={Landmark} tone="ink" label="رصيد البنك" value={n0.format(bank.balance)} unit="دينار" sub="الحساب البنكي" />

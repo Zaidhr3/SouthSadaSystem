@@ -3,9 +3,12 @@ import { Grid, Input, Select, Textarea, FileInput } from "@/components/forms";
 import { toInputDate } from "@/lib/format";
 import { STAGE_OPTIONS } from "@/lib/project-phase";
 
-export function TenderFields({ t, managers, withFiles, kind: kindProp }: { t?: Tender; managers: { id: number; name: string }[]; withFiles?: boolean; kind?: "GOV" | "PRIVATE" }) {
+/** بيانات صاحب المشروع الخاص لحساب البوابة (تُعبّأ تلقائياً من طلب الموقع) */
+export type ClientPrefill = { name?: string; email?: string | null; phone?: string | null; quoteId?: number; password?: string };
+
+export function TenderFields({ t, managers, withFiles, kind: kindProp, client }: { t?: Partial<Tender>; managers: { id: number; name: string }[]; withFiles?: boolean; kind?: "GOV" | "PRIVATE"; client?: ClientPrefill }) {
   const priv = (t?.kind ?? kindProp) === "PRIVATE";
-  if (priv) return <PrivateFields t={t} managers={managers} withFiles={withFiles} />;
+  if (priv) return <PrivateFields t={t} managers={managers} withFiles={withFiles} client={client} />;
   return (
     <>
       <input type="hidden" name="kind" value="GOV" />
@@ -102,7 +105,7 @@ export function StageFields() {
 }
 
 /** مشروع خاص (غير حكومي): مالك فرد أو شركة — بلا ثمن وثائق ولا دائرة عطاءات */
-function PrivateFields({ t, managers, withFiles }: { t?: Tender; managers: { id: number; name: string }[]; withFiles?: boolean }) {
+function PrivateFields({ t, managers, withFiles, client }: { t?: Partial<Tender>; managers: { id: number; name: string }[]; withFiles?: boolean; client?: ClientPrefill }) {
   const today = new Date().toISOString().slice(0, 10);
   return (
     <>
@@ -127,6 +130,22 @@ function PrivateFields({ t, managers, withFiles }: { t?: Tender; managers: { id:
       </Grid>
       <Textarea name="notes" label="وصف المشروع وملاحظات" defaultValue={t?.notes ?? ""} />
       {withFiles && <FileInput label="المخططات والمواصفات وجداول الكميات والمستلزمات" />}
+      {!t?.id && (
+        <section className="rounded-2xl border border-accent/30 bg-accent-soft/40 p-4">
+          {client?.quoteId && <input type="hidden" name="quoteId" value={client.quoteId} />}
+          <p className="mb-1 font-bold text-accent">حساب صاحب المشروع في بوابة العملاء</p>
+          <p className="mb-3 text-xs leading-6 text-ink-muted">يدخل صاحب المشروع بالبريد الإلكتروني وكلمة السر ويتابع إجراءات مشروعه (المراحل، نسبة الإنجاز، خطة العمل، اليوميات، المراسلات والتواقيع). تُرسل بيانات الدخول لبريده، وتُطلب منه كلمة سر جديدة عند أول دخول. اترك البريد فارغاً إن لم تُرد إنشاء حساب الآن.</p>
+          <Grid>
+            <Input name="clientName" label="اسم صاحب المشروع" defaultValue={client?.name ?? ""} />
+            <Input name="clientPhone" label="رقم الهاتف" dir="ltr" defaultValue={client?.phone ?? ""} />
+          </Grid>
+          <Grid>
+            <Input name="clientEmail" label="البريد الإلكتروني (اسم الدخول)" type="email" dir="ltr" defaultValue={client?.email ?? ""} />
+            <Input name="clientPassword" label="كلمة السر" dir="ltr" autoComplete="off" defaultValue={client?.password ?? ""} hint="8 أحرف على الأقل — مقترحة تلقائياً ويمكنك تغييرها" />
+          </Grid>
+          <label className="mt-2 flex items-center gap-2 text-sm font-semibold"><input type="checkbox" name="clientSendEmail" defaultChecked /> أرسل بيانات الدخول لبريد صاحب المشروع</label>
+        </section>
+      )}
     </>
   );
 }

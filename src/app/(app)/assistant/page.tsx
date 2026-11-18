@@ -26,6 +26,8 @@ const TOOL_LABEL: Record<string, string> = {
   recent_activity: "راجع سجل النشاط",
   list_issues: "راجع سجل المشاكل",
   log_issue: "سجّل مشكلة",
+  site_weather: "راجع طقس المواقع",
+  exchange_rates: "راجع أسعار الصرف",
 };
 const SEV: Record<string, { label: string; tone: "red" | "orange" | "blue" | "gray" }> = {
   CRITICAL: { label: "حرجة", tone: "red" },

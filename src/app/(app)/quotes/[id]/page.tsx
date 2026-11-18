@@ -138,9 +138,7 @@ export default async function QuotePage({ params }: { params: { id: string } }) 
               {q.accountantNotes && <p className="mb-3 text-sm text-ink-soft">ملاحظات المحاسب: {q.accountantNotes}</p>}
               <div className="grid gap-3 sm:grid-cols-2">
                 <ModalForm title="اعتماد نهائي" trigger={<><CheckCircle2 className="h-4 w-4" /> اعتماد نهائي</>} action={adminQuote.bind(null, id, "approve")}>
-                  <label className="flex items-center gap-2 rounded-xl bg-gold-soft p-3 text-sm font-semibold">
-                    <input type="checkbox" name="createProject" defaultChecked /> إنشاء «مشروع خاص» من هذا الطلب (ينقل الدراسة والمرفقات)
-                  </label>
+                  <p className="rounded-xl bg-gold-soft p-3 text-sm font-semibold leading-6">بعد الاعتماد تنتقل مباشرة لنموذج «مشروع خاص» معبأ ببيانات الطلب: تحدد المرحلة وتنشئ لصاحب المشروع حساباً (البريد + كلمة السر) ليتابع إجراءات مشروعه من البوابة — هذا هو الرد عليه.</p>
                   <Textarea name="note" label="ملاحظات (اختياري)" />
                 </ModalForm>
                 <ModalForm title="رفض الطلب" trigger={<><XCircle className="h-4 w-4" /> رفض</>} triggerClass="btn-danger" action={adminQuote.bind(null, id, "reject")}>
@@ -149,8 +147,13 @@ export default async function QuotePage({ params }: { params: { id: string } }) 
               </div>
             </Card>
           )}
-          {q.tenderId && (
+          {q.tenderId ? (
             <Link href={`/tenders/${q.tenderId}`} className="card card-pad block font-bold text-accent hover:underline">فتح المشروع الخاص المُنشأ من هذا الطلب ←</Link>
+          ) : (
+            q.status === "APPROVED" &&
+            can.approveQuotes(user.role) && (
+              <Link href={`/tenders/new?kind=PRIVATE&quote=${q.id}`} className="card card-pad block border-2 border-accent/40 font-bold text-accent hover:underline">افتح مشروعاً خاصاً لصاحب الطلب (مع حساب البوابة) ←</Link>
+            )
           )}
         </div>
 
