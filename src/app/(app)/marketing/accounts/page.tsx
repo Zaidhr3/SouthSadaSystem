@@ -5,10 +5,11 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { can, see } from "@/lib/permissions";
 import { VERDICT, type Metrics } from "@/lib/social";
-import { adsConfig, type BoostAdvice } from "@/lib/boost";
+import { adsConfig, metaAdAccounts, type BoostAdvice } from "@/lib/boost";
+import { metaCan } from "@/lib/meta";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { ActionForm, Input } from "@/components/forms";
-import { adviseBoost, decidePost, launchBoost, refreshAccounts, saveAdsAction } from "../../actions/social";
+import { ActionForm, Input, Select } from "@/components/forms";
+import { adviseBoost, decidePost, launchBoost, pickAdAccountAction, refreshAccounts, saveAdsAction } from "../../actions/social";
 
 export const metadata = { title: "حساباتي — فيسبوك وإنستغرام" };
 export const maxDuration = 300;
@@ -26,6 +27,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: { f
     adsConfig(),
     db.adBoost.findMany({ orderBy: { id: "desc" }, take: 200 }),
   ]);
+  const metaAccounts = admin && (await metaCan("ads")) ? await metaAdAccounts() : [];
   const lastBoost = new Map<string, (typeof drafts)[number]>();
   drafts.forEach((d) => !lastBoost.has(d.postId) && lastBoost.set(d.postId, d));
   const cnt = (v: string) => all.filter((p) => p.verdict === v && !p.decision).length;
@@ -106,6 +108,9 @@ export default async function AccountsPage({ searchParams }: { searchParams: { f
                     <span className="flex items-center gap-1"><Heart className="h-3.5 w-3.5" /> {m.likes}</span>
                     <span className="flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /> {m.comments}</span>
                     {p.platform === "FB" && <span className="flex items-center gap-1"><Share2 className="h-3.5 w-3.5" /> {m.shares}</span>}
+                    {m.reach != null && <span title="الوصول">👁 {m.reach}</span>}
+                    {m.views != null && <span title="المشاهدات">▶ {m.views}</span>}
+                    {m.saves != null && <span title="الحفظ">🔖 {m.saves}</span>}
                     {p.boostScore != null && (
                       <span className="ms-auto flex items-center gap-1" title="جدارة التمويل">
                         <Rocket className="h-3.5 w-3.5 text-accent" />
@@ -167,6 +172,17 @@ export default async function AccountsPage({ searchParams }: { searchParams: { f
       {admin && (
         <Card className="mt-6" title={<span className="flex items-center gap-2"><Rocket className="h-5 w-5 text-accent" /> إعداد التمويل الإعلاني</span>}>
           {ads ? <p className="mb-3 text-sm">الحساب الإعلاني مربوط: <b dir="ltr">{ads.adAccountId}</b> — السقف الشهري <b>{ads.monthlyCap} {ads.currency}</b></p> : <p className="mb-3 text-sm text-ink-muted">لتفعيل التمويل من النظام: أنشئ رمزاً بصلاحية <code dir="ltr">ads_management</code> من Graph API Explorer، وانسخ رقم الحساب الإعلاني من Ads Manager.</p>}
+          {metaAccounts.length > 0 && (
+            <div className="mb-4 rounded-2xl bg-good-soft/50 p-3">
+              <p className="mb-2 text-sm font-bold text-good">ربط فيسبوك يملك صلاحيات الإعلانات — اختر الحساب الإعلاني مباشرة (بلا رمز منفصل)</p>
+              <ActionForm action={pickAdAccountAction} submitLabel="استخدم هذا الحساب">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Select name="account" label="الحساب الإعلاني" options={metaAccounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})${a.active ? "" : " — غير فعّال"}` }))} defaultValue={ads?.adAccountId ?? metaAccounts.find((a) => a.active)?.id} />
+                  <Input name="cap" label="السقف الشهري" type="number" min="1" defaultValue={String(ads?.monthlyCap ?? 100)} required />
+                </div>
+              </ActionForm>
+            </div>
+          )}
           <ActionForm action={saveAdsAction} submitLabel={ads ? "تحديث" : "ربط الحساب الإعلاني"}>
             <div className="grid gap-3 sm:grid-cols-3">
               <Input name="token" label="رمز الإعلانات" type="password" dir="ltr" autoComplete="off" required />

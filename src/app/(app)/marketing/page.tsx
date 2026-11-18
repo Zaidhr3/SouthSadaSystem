@@ -1,7 +1,7 @@
 import Link from "next/link";
 import clsx from "clsx";
 import type { Prisma } from "@prisma/client";
-import { RefreshCcw, Images, LayoutGrid, Palette, Facebook, Instagram, UserRoundSearch } from "lucide-react";
+import { RefreshCcw, Images, LayoutGrid, Palette, Facebook, Instagram, UserRoundSearch, MessagesSquare } from "lucide-react";
 import { VERDICT } from "@/lib/social";
 import { CalendarDays, Fingerprint, Lightbulb, Megaphone, Radar, Sparkles, Wand2 } from "lucide-react";
 import { runPageAuditAction } from "../actions/meta";
@@ -56,6 +56,7 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
             <Link href="/marketing/grid" className="btn-secondary"><LayoutGrid className="h-4 w-4" /> شبكة إنستغرام</Link>
             <Link href="/marketing/media" className="btn-secondary"><Images className="h-4 w-4" /> مكتبة الوسائط</Link>
             <Link href="/marketing/brand" className="btn-secondary"><Palette className="h-4 w-4" /> هوية الحسابات</Link>
+            <Link href="/marketing/inbox" className="btn-secondary"><MessagesSquare className="h-4 w-4" /> صندوق الرسائل</Link>
             <Link href="/marketing/relaunch" className="btn-secondary"><RefreshCcw className="h-4 w-4" /> إعادة إطلاق الصفحة</Link>
           </>
         }

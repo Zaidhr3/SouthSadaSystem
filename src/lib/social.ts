@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./db";
-import { callMeta, getMetaConfig, MetaError } from "./meta";
+import { callMeta, getMetaConfig, metaCan, MetaError } from "./meta";
 import { writeJson } from "./ai/writer";
 
 /**
@@ -16,7 +16,7 @@ export const VERDICT: Record<string, { label: string; tone: "green" | "blue" | "
   BOOST: { label: "يستحق التمويل", tone: "purple" },
 };
 
-export type Metrics = { likes: number; comments: number; shares: number; views?: number; engagement: number };
+export type Metrics = { likes: number; comments: number; shares: number; views?: number; reach?: number; saves?: number; engagement: number };
 
 type FbRaw = { id: string; message?: string; created_time: string; full_picture?: string; permalink_url?: string; status_type?: string; from?: { id: string }; attachments?: { data?: { media_type?: string; type?: string }[] }; reactions?: { summary?: { total_count?: number } }; comments?: { summary?: { total_count?: number } }; shares?: { count?: number } };
 type IgRaw = { id: string; caption?: string; media_type?: string; media_product_type?: string; media_url?: string; thumbnail_url?: string; permalink?: string; timestamp: string; like_count?: number; comments_count?: number };
@@ -58,6 +58,34 @@ export async function syncSocial(limit = 50) {
     } catch (e) {
       errors.push(`إنستغرام: ${e instanceof Error ? e.message : e}`);
     }
+  }
+  // الإحصاءات الحقيقية (تعمل تلقائياً متى مُنحت الصلاحيات): الوصول والمشاهدات والحفظ — آخر 90 يوماً
+  const since = new Date(Date.now() - 90 * 86400_000);
+  const [igIns, fbIns] = await Promise.all([metaCan("ig_insights"), metaCan("fb_insights")]);
+  if (igIns && seen.IG.length) {
+    const recent = await db.socialPost.findMany({ where: { id: { in: seen.IG }, postedAt: { gte: since } }, select: { id: true, mediaType: true, metrics: true } });
+    await Promise.all(
+      recent.map(async (p) => {
+        const metric = p.mediaType === "CAROUSEL" ? "reach,saved,total_interactions" : "reach,views,saved,shares,total_interactions";
+        const r = await callMeta<{ data: { name: string; values: { value: number }[] }[] }>("GET", `${p.id}/insights`, { metric }).catch(() => null);
+        if (!r) return;
+        const v = Object.fromEntries(r.data.map((d) => [d.name, d.values?.[0]?.value ?? 0]));
+        const m = { ...(p.metrics as Metrics), reach: v.reach, views: v.views, saves: v.saved, shares: v.shares ?? (p.metrics as Metrics).shares };
+        m.engagement = m.likes + m.comments * 3 + (m.shares ?? 0) * 5 + (m.saves ?? 0) * 4;
+        await db.socialPost.update({ where: { id: p.id }, data: { metrics: m } });
+      }),
+    );
+  }
+  if (fbIns && seen.FB.length) {
+    const recent = await db.socialPost.findMany({ where: { id: { in: seen.FB }, postedAt: { gte: since } }, select: { id: true, metrics: true } });
+    await Promise.all(
+      recent.map(async (p) => {
+        const r = await callMeta<{ data: { name: string; values: { value: number }[] }[] }>("GET", `${p.id}/insights`, { metric: "post_total_media_view_unique,post_media_view" }).catch(() => null);
+        if (!r?.data?.length) return;
+        const v = Object.fromEntries(r.data.map((d) => [d.name, d.values?.[0]?.value ?? 0]));
+        await db.socialPost.update({ where: { id: p.id }, data: { metrics: { ...(p.metrics as Metrics), reach: v.post_total_media_view_unique, views: v.post_media_view } } });
+      }),
+    );
   }
   // ما لم يعد موجوداً على الحساب (ضمن نافذة السحب) = حُذف أو أُرشف
   for (const pf of ["FB", "IG"] as const) {
@@ -122,7 +150,7 @@ export async function analyzeSocial(opts: { all?: boolean } = {}) {
               .map((p) => {
                 const m = (p.metrics as Metrics | null) ?? { likes: 0, comments: 0, shares: 0, engagement: 0 };
                 const flags = [replaced.has(p.id) ? "له نسخة أحدث منشورة من النظام (إعادة إطلاق)" : "", isOurs(p.id) ? "منشور حديث من النظام بقالب الشركة" : "", !p.picture ? "بلا صورة" : ""].filter(Boolean).join("، ");
-                return `### id=${p.id} | ${p.platform === "FB" ? "فيسبوك" : "إنستغرام"} | ${p.mediaType} | ${p.postedAt.toISOString().slice(0, 10)} | إعجاب ${m.likes} تعليق ${m.comments} مشاركة ${m.shares} (تفاعل ${m.engagement})${flags ? ` | ${flags}` : ""}\n${(p.text ?? "— بلا نص —").slice(0, 500)}`;
+                return `### id=${p.id} | ${p.platform === "FB" ? "فيسبوك" : "إنستغرام"} | ${p.mediaType} | ${p.postedAt.toISOString().slice(0, 10)} | إعجاب ${m.likes} تعليق ${m.comments} مشاركة ${m.shares}${m.reach != null ? ` وصول ${m.reach}` : ""}${m.views != null ? ` مشاهدات ${m.views}` : ""}${m.saves != null ? ` حفظ ${m.saves}` : ""} (تفاعل ${m.engagement})${flags ? ` | ${flags}` : ""}\n${(p.text ?? "— بلا نص —").slice(0, 500)}`;
               })
               .join("\n\n")}`,
           },

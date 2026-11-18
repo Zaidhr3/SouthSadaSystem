@@ -15,10 +15,12 @@ import { applyCaption, approveAndPublish, autoClean, chatOnItem, deleteItem, run
 import { CHECK_LABEL, detect, structuralFlags, VERDICT, type CheckName } from "@/lib/content-skills/humanizer";
 import { SKILLS } from "@/lib/content-skills/skills";
 import { SkillRunner } from "../skill-runner";
-import { CalendarClock, Fingerprint, MessagesSquare, Palette, Sparkles } from "lucide-react";
+import { CalendarClock, Fingerprint, MessagesSquare, Mic, Palette, Sparkles } from "lucide-react";
 import { composeAction, importCanva, smartComposeAction } from "../../actions/design";
 import { TEMPLATES, type TemplateId } from "@/lib/design/templates";
 import { canvaStatus, listDesigns } from "@/lib/canva";
+import { servicesStatus, voices as elVoices } from "@/lib/ai-services";
+import { voiceoverAction } from "../../actions/ai-services";
 
 export const metadata = { title: "محتوى تسويقي" };
 /** توليد التصاميم بالمتصفح + النشر (كاروسيل) قد يستغرقان دقيقة */
@@ -42,6 +44,8 @@ export default async function MarketingItemPage({ params }: { params: { id: stri
   ]);
   slides.sort((a, b) => Number(a.slot!.slice(6)) - Number(b.slot!.slice(6)));
   const canvaDesigns = canva.connected ? await listDesigns(8).catch(() => []) : [];
+  const voiceOn = (await servicesStatus()).elevenlabs;
+  const [voiceList, voiceAtt] = await Promise.all([voiceOn ? elVoices().catch(() => []) : [], db.attachment.findFirst({ where: { entityType: "marketing", entityId: id, slot: "voice" }, orderBy: { id: "desc" } })]);
   const chosen: number[] = it.mediaIds ? (JSON.parse(it.mediaIds).ids ?? []) : [];
   // متصل فعلياً للنشر: الرمز سليم ويملك صلاحية النشر
   const connected = !!meta?.configured && meta.ok && !meta.missingScopes?.includes("pages_manage_posts");
@@ -271,6 +275,23 @@ export default async function MarketingItemPage({ params }: { params: { id: stri
                 </div>
               ) : (
                 <p className="mt-3 text-xs text-ink-muted">ربط Canva لاستيراد التصاميم الجاهزة من «إعدادات النظام».</p>
+              )}
+            </Card>
+          )}
+
+          {editable && !audit && (voiceOn || voiceAtt) && (
+            <Card title={<span className="flex items-center gap-2"><Mic className="h-5 w-5 text-accent" /> تعليق صوتي للريل/القصة (ElevenLabs)</span>}>
+              {voiceAtt && (
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <audio controls src={`/api/files/${voiceAtt.id}`} className="h-10 max-w-full" />
+                  <a href={`/api/files/${voiceAtt.id}`} download={`sada-voice-${id}.mp3`} className="btn-secondary btn-sm">تنزيل MP3</a>
+                </div>
+              )}
+              {voiceOn && (
+                <ActionForm action={voiceoverAction.bind(null, id)} submitLabel={voiceAtt ? "إعادة التوليد" : "ولّد التعليق الصوتي"}>
+                  <Select name="voice" label="الصوت" options={voiceList.map((v) => ({ value: v.id, label: `${v.name}${v.desc ? ` — ${v.desc}` : ""}` }))} defaultValue={voiceList[0]?.id} />
+                  <Textarea name="script" label="نص التعليق (اختياري)" rows={3} placeholder="فارغ = نص الشاشة للقصة أو أول فقرتين من المنشور" />
+                </ActionForm>
               )}
             </Card>
           )}

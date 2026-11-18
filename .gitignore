@@ -17,3 +17,6 @@ backups/
 
 scripts/_diag/
 .next-check/
+
+.claude/skills/
+graphify-out/

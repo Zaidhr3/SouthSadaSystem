@@ -14,3 +14,12 @@ screenshots/
 cloudflared
 *.exe
 tsconfig.tsbuildinfo
+
+# مهارات وأدوات التطوير — لا تدخل في بناء النظام
+.agents/
+.claude/
+scripts/_diag/
+docs/
+skills-lock.json
+.mcp.json
+graphify-out/

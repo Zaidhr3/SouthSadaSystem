@@ -17,8 +17,33 @@ const V = () => process.env.META_GRAPH_VERSION || "v23.0";
 
 export async function adsConfig(): Promise<AdsConfig | null> {
   if (process.env.META_ADS_TOKEN && process.env.META_AD_ACCOUNT_ID) return { token: process.env.META_ADS_TOKEN, adAccountId: process.env.META_AD_ACCOUNT_ID, monthlyCap: Number(process.env.BOOST_MONTHLY_CAP || 100) };
-  const s = await getSecret<AdsConfig>(SECRET);
-  return s?.value ?? null;
+  const s = await getSecret<AdsConfig & { fromMeta?: boolean }>(SECRET);
+  if (!s?.value) return null;
+  // حساب إعلاني مختار من ربط فيسبوك نفسه: الرمز يُقرأ من الربط الحالي (يتجدد معه)
+  if (s.value.fromMeta) {
+    const cfg = await getMetaConfig();
+    if (!cfg?.userToken) return null;
+    return { ...s.value, token: cfg.userToken };
+  }
+  return s.value;
+}
+
+/** الحسابات الإعلانية المتاحة عبر ربط فيسبوك (إن مُنحت ads_management/ads_read) */
+export async function metaAdAccounts(): Promise<{ id: string; name: string; currency: string; active: boolean }[]> {
+  const cfg = await getMetaConfig();
+  if (!cfg?.userToken) return [];
+  const r = await ads<{ data: { id: string; name?: string; currency?: string; account_status?: number }[] }>("GET", "me/adaccounts", { fields: "id,name,currency,account_status", limit: "50" }, cfg.userToken).catch(() => ({ data: [] }));
+  return r.data.map((a) => ({ id: a.id, name: a.name ?? a.id, currency: a.currency ?? "", active: a.account_status === 1 }));
+}
+
+/** اختيار حساب إعلاني من ربط فيسبوك بدل إدخال رمز منفصل */
+export async function selectMetaAdAccount(adAccountId: string, monthlyCap: number) {
+  const cfg = await getMetaConfig();
+  if (!cfg?.userToken) throw new Error("ربط فيسبوك الحالي لا يتضمن صلاحيات الإعلانات — أعد الربط برمز مستخدم فيه ads_management");
+  const acc = await ads<{ name?: string; currency?: string; account_status?: number }>("GET", adAccountId, { fields: "name,currency,account_status" }, cfg.userToken);
+  if (acc.account_status !== 1) throw new Error("الحساب الإعلاني غير فعّال — فعّله من Meta Ads Manager");
+  await setSecret(SECRET, { token: "", adAccountId, monthlyCap, currency: acc.currency, fromMeta: true }, { name: acc.name, savedAt: new Date().toISOString() });
+  return { name: acc.name, currency: acc.currency };
 }
 
 async function ads<T>(method: "GET" | "POST", path: string, params: Record<string, string>, token: string): Promise<T> {

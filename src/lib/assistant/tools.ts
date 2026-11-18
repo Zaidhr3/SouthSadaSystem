@@ -14,6 +14,7 @@ import { MKT_STATUS } from "../marketing";
 import { tenderCoords } from "../external/geo";
 import { forecast } from "../external/weather";
 import { jodRates } from "../external/fx";
+import { scrapeUrl, webResearch, webSearch } from "../ai-services";
 
 /**
  * أدوات مساعد النظام — قراءة فقط (عدا تسجيل مشكلة في سجل المشاكل).
@@ -141,6 +142,24 @@ export const TOOLS: (ToolDef & { run: Handler })[] = [
     description: "أسعار صرف الدينار الأردني الحالية (دولار، يورو، درهم، ريال، جنيه، ليرة تركية، يوان) — لتسعير المواد المستوردة وعروض الموردين.",
     parameters: { type: "object", properties: {} },
     run: async () => (await jodRates()) ?? { error: "تعذر جلب الأسعار الآن" },
+  },
+  {
+    name: "web_research",
+    description: "بحث ويب حيّ بمصادر (Perplexity): أسعار مواد البناء في الأردن، أنظمة وتعليمات دائرة العطاءات، أخبار القطاع، منافسون. استخدمه لأي معلومة خارج بيانات النظام. recencyDays اختياري لحداثة النتائج.",
+    parameters: { type: "object", properties: { query: { type: "string" }, recencyDays: { type: "number" } }, required: ["query"] },
+    run: async (a) => webResearch(String(a.query), { recencyDays: a.recencyDays ? Number(a.recencyDays) : undefined }),
+  },
+  {
+    name: "read_website",
+    description: "قراءة صفحة ويب كنص نظيف (Firecrawl): إعلانات العطاءات، كتالوج مورد، صفحة منافس. أعطه الرابط الكامل.",
+    parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] },
+    run: async (a) => scrapeUrl(String(a.url)),
+  },
+  {
+    name: "web_search",
+    description: "بحث ويب سريع يعيد روابط وعناوين (Firecrawl) — ثم استخدم read_website لقراءة الأنسب.",
+    parameters: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query"] },
+    run: async (a) => webSearch(String(a.query), Math.min(Number(a.limit) || 5, 10)),
   },
   {
     name: "list_issues",

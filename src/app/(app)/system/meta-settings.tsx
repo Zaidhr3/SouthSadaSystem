@@ -1,7 +1,7 @@
 import { CheckCircle2, Facebook, Instagram, Unplug, XCircle } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
 import { ActionForm, ConfirmButton, Input } from "@/components/forms";
-import { DEFAULT_PAGE_ID, metaStatus } from "@/lib/meta";
+import { ALL_SCOPES, CAPABILITIES, capabilityOn, DEFAULT_PAGE_ID, metaStatus } from "@/lib/meta";
 import { checkMetaAction, connectMetaAction, disconnectMeta } from "../actions/meta";
 
 const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Amman", dateStyle: "short", timeStyle: "short" }) : "—");
@@ -35,6 +35,25 @@ export async function MetaSettings() {
         </ul>
       )}
       {connected && (
+        <div className="mb-4 rounded-2xl border border-line p-3">
+          <p className="mb-2 text-sm font-bold">الميزات حسب الصلاحيات الممنوحة {s!.scopes ? <span className="font-normal text-ink-muted">({s!.scopes.length} صلاحية)</span> : <span className="font-normal text-ink-muted">— اضغط «اختبار الاتصال» لقراءتها</span>}</p>
+          <ul className="grid gap-1.5 sm:grid-cols-2">
+            {CAPABILITIES.map((c) => {
+              const on = capabilityOn(s!.scopes, c.key);
+              return (
+                <li key={c.key} className={on ? "flex items-start gap-2 rounded-xl bg-good-soft/60 px-2.5 py-1.5 text-sm" : "flex items-start gap-2 rounded-xl bg-black/[0.03] px-2.5 py-1.5 text-sm text-ink-muted"}>
+                  {on ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-good" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-ink-faint" />}
+                  <span className="min-w-0">
+                    <b className={on ? "text-ink" : ""}>{c.label}</b>
+                    {!on && <span dir="ltr" className="block font-mono text-[10px]">{c.scopes.filter((x) => !s!.scopes?.includes(x)).join(c.any ? " أو " : ", ")}</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {connected && (
         <div className="mb-4 flex flex-wrap gap-2">
           <ActionForm action={checkMetaAction} submitLabel="اختبار الاتصال" resetOnSuccess={false}>
             <span />
@@ -61,7 +80,11 @@ export async function MetaSettings() {
             <ol className="mt-2 list-decimal space-y-1 ps-5 text-ink-soft">
               <li>ادخل developers.facebook.com بحساب مدير صفحة «صدى الجنوب» ← My Apps ← Create App (نوع Business).</li>
               <li>أضف المنتجين: «Facebook Login for Business» و«Instagram» (واربط حساب إنستغرام بالصفحة كحساب أعمال من إعدادات الصفحة).</li>
-              <li>افتح Tools ← Graph API Explorer، اختر تطبيقك، ثم Get User Access Token مع الصلاحيات: pages_show_list، pages_read_engagement، pages_manage_posts، pages_manage_engagement، instagram_basic، instagram_content_publish، instagram_manage_comments.</li>
+              <li>
+                افتح Tools ← Graph API Explorer، اختر تطبيقك، ثم Get User Access Token وفعّل كل الصلاحيات التالية (كل صلاحية تشغّل ميزتها في النظام تلقائياً):
+                <code dir="ltr" className="mt-1 block select-all break-all rounded-lg bg-black/[0.05] p-2 font-mono text-[11px] leading-5">{ALL_SCOPES.join(",")}</code>
+                بعض الصلاحيات (الرسائل، الإحصاءات، الإعلانات، العملاء المحتملون) تعمل فوراً لمديري التطبيق نفسه، ولغيرهم تحتاج مراجعة Meta (App Review).
+              </li>
               <li>انسخ الرمز والصقه هنا، وأدخل App ID وApp Secret (من App settings ← Basic) ليصبح الرمز دائماً.</li>
             </ol>
           </details>

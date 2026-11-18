@@ -20,16 +20,46 @@ const V = () => process.env.META_GRAPH_VERSION || "v23.0";
 const SECRET = "meta";
 const PUBLIC_BUCKET = "sada-marketing";
 
-export type MetaConfig = { pageId: string; token: string; igUserId: string | null; source: "env" | "settings"; pageName?: string; igUsername?: string };
+export type MetaConfig = { pageId: string; token: string; igUserId: string | null; source: "env" | "settings"; pageName?: string; igUsername?: string; userToken?: string | null };
 /** الصلاحيات اللازمة لكل وظائف النظام (النشر، التعليقات، إنستغرام) */
 export const REQUIRED_SCOPES = ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_engagement", "instagram_basic", "instagram_content_publish", "instagram_manage_comments"];
-export type MetaStatus = { missingScopes?: string[]; ok: boolean; checkedAt?: string; error?: string; errorKind?: MetaErrorKind; pageName?: string; igUsername?: string; expiresAt?: string | null; connectedBy?: string; connectedAt?: string };
+/**
+ * خريطة الصلاحيات ← الميزات: كل صلاحية تُمنح للتطبيق في developers.facebook.com تفعّل ميزتها تلقائياً في النظام
+ * عند الربط أو الفحص الصباحي (لا حاجة لأي تعديل في الكود).
+ */
+export const CAPABILITIES: { key: string; label: string; scopes: string[]; any?: boolean; core?: boolean }[] = [
+  { key: "publish", label: "النشر على فيسبوك (منشورات وقصص وكاروسيل)", scopes: ["pages_show_list", "pages_read_engagement", "pages_manage_posts"], core: true },
+  { key: "ig_publish", label: "النشر على إنستغرام", scopes: ["instagram_basic", "instagram_content_publish"], core: true },
+  { key: "comments", label: "قراءة التعليقات والرد عليها", scopes: ["pages_manage_engagement", "instagram_manage_comments"], core: true },
+  { key: "page_identity", label: "تغيير الصورة الشخصية والغلاف من النظام", scopes: ["pages_manage_metadata"] },
+  { key: "fb_insights", label: "أرقام الوصول والمشاهدات لفيسبوك", scopes: ["read_insights"] },
+  { key: "ig_insights", label: "أرقام الوصول والمشاهدات والحفظ لإنستغرام", scopes: ["instagram_manage_insights"] },
+  { key: "messenger", label: "صندوق رسائل ماسنجر والرد بالذكاء الاصطناعي", scopes: ["pages_messaging"] },
+  { key: "ig_dm", label: "رسائل إنستغرام الخاصة والرد عليها", scopes: ["instagram_manage_messages"] },
+  { key: "user_content", label: "منشورات الزوار والإشارات على الصفحة", scopes: ["pages_read_user_content"] },
+  { key: "ads", label: "التمويل الإعلاني من نفس الربط (بلا رمز منفصل)", scopes: ["ads_management", "ads_read"], any: true },
+  { key: "leads", label: "عملاء نماذج الإعلانات ← طلبات تسعير تلقائياً", scopes: ["leads_retrieval"] },
+  { key: "business", label: "إدارة الأصول عبر Business Manager", scopes: ["business_management"] },
+];
+export const ALL_SCOPES = [...new Set(CAPABILITIES.flatMap((c) => c.scopes))];
+export const capabilityOn = (granted: string[] | undefined, key: string) => {
+  const c = CAPABILITIES.find((x) => x.key === key);
+  if (!c || !granted) return false;
+  return c.any ? c.scopes.some((x) => granted.includes(x)) : c.scopes.every((x) => granted.includes(x));
+};
+/** هل الصلاحية/الميزة ممنوحة حالياً؟ (من آخر فحص محفوظ — بلا استدعاء لـ Meta) */
+export async function metaCan(key: string) {
+  const st = await metaStatus();
+  return !!st?.configured && capabilityOn(st.scopes, key);
+}
+
+export type MetaStatus = { scopes?: string[]; missingScopes?: string[]; ok: boolean; checkedAt?: string; error?: string; errorKind?: MetaErrorKind; pageName?: string; igUsername?: string; expiresAt?: string | null; connectedBy?: string; connectedAt?: string };
 
 export async function getMetaConfig(): Promise<MetaConfig | null> {
   if (process.env.META_PAGE_TOKEN) {
     return { pageId: process.env.META_PAGE_ID || DEFAULT_PAGE_ID, token: process.env.META_PAGE_TOKEN, igUserId: process.env.META_IG_USER_ID || null, source: "env" };
   }
-  const s = await getSecret<{ pageId: string; token: string; igUserId: string | null }>(SECRET);
+  const s = await getSecret<{ pageId: string; token: string; igUserId: string | null; userToken?: string | null }>(SECRET);
   if (!s?.value.token) return null;
   return { ...s.value, source: "settings", pageName: s.meta.pageName as string | undefined, igUsername: s.meta.igUsername as string | undefined };
 }
@@ -154,17 +184,21 @@ export async function connectMeta(input: { token: string; pageId?: string; appId
   const page = await graph<{ id: string; name: string; instagram_business_account?: { id: string; username?: string } }>("GET", pageId, { fields: "id,name,instagram_business_account{id,username}" }, pageToken);
   let expiresAt: string | null = null;
   let missingScopes: string[] | undefined;
+  let scopes: string[] | undefined;
   try {
     const dbg = await graph<{ data?: { expires_at?: number; scopes?: string[] } }>("GET", "debug_token", { input_token: pageToken }, pageToken);
     const exp = dbg.data?.expires_at;
     expiresAt = exp ? new Date(exp * 1000).toISOString() : null;
-    if (dbg.data?.scopes) missingScopes = REQUIRED_SCOPES.filter((x) => !dbg.data!.scopes!.includes(x));
+    scopes = dbg.data?.scopes;
+    if (scopes) missingScopes = REQUIRED_SCOPES.filter((x) => !scopes!.includes(x));
   } catch {
     /* debug_token اختياري */
   }
   const igUserId = page.instagram_business_account?.id ?? null;
-  const status: MetaStatus = { ok: true, missingScopes, pageName: page.name, igUsername: page.instagram_business_account?.username, expiresAt, checkedAt: new Date().toISOString(), connectedBy: by, connectedAt: new Date().toISOString() };
-  await setSecret(SECRET, { pageId, token: pageToken, igUserId }, status);
+  // رمز المستخدم (الطويل) يُحفظ مشفّراً فقط إن منح صلاحيات الإعلانات/الأعمال — للتمويل من نفس الربط
+  const userToken = me.id !== pageId && scopes?.some((x) => ["ads_management", "ads_read", "business_management"].includes(x)) ? token : null;
+  const status: MetaStatus = { ok: true, scopes, missingScopes, pageName: page.name, igUsername: page.instagram_business_account?.username, expiresAt, checkedAt: new Date().toISOString(), connectedBy: by, connectedAt: new Date().toISOString() };
+  await setSecret(SECRET, { pageId, token: pageToken, igUserId, userToken }, status);
   return status;
 }
 
@@ -174,7 +208,10 @@ export async function checkMeta(): Promise<MetaStatus> {
   if (!cfg) return { ok: false, error: "غير مربوط" };
   try {
     const page = await graph<{ name: string; instagram_business_account?: { username?: string } }>("GET", cfg.pageId, { fields: "name,instagram_business_account{username}" }, cfg.token);
-    const st: MetaStatus = { ok: true, pageName: page.name, igUsername: page.instagram_business_account?.username, checkedAt: new Date().toISOString(), error: undefined, errorKind: undefined };
+    // الصلاحيات تُعاد قراءتها في كل فحص: أي صلاحية جديدة تُمنح في developers.facebook تُفعَّل تلقائياً
+    const dbg = await graph<{ data?: { scopes?: string[]; expires_at?: number } }>("GET", "debug_token", { input_token: cfg.token }, cfg.token).catch(() => null);
+    const scopes = dbg?.data?.scopes;
+    const st: MetaStatus = { ok: true, pageName: page.name, igUsername: page.instagram_business_account?.username, checkedAt: new Date().toISOString(), error: undefined, errorKind: undefined, ...(scopes ? { scopes, missingScopes: REQUIRED_SCOPES.filter((x) => !scopes.includes(x)) } : {}) };
     if (cfg.source === "settings") await patchSecretMeta(SECRET, st);
     return st;
   } catch (e) {

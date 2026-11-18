@@ -5,7 +5,7 @@ import { actionUser } from "@/lib/auth";
 import { auditEvent, run, type ActionState } from "@/lib/action";
 import { AppError, can } from "@/lib/permissions";
 import { analyzeSocial, applyDecision, syncSocial } from "@/lib/social";
-import { createBoost, boostAdvice, saveAdsConfig } from "@/lib/boost";
+import { createBoost, boostAdvice, saveAdsConfig, selectMetaAdAccount } from "@/lib/boost";
 
 const done = () => {
   revalidatePath("/marketing/accounts");
@@ -82,6 +82,23 @@ export async function saveAdsAction(_: ActionState, fd: FormData): Promise<Actio
     });
     await auditEvent("UPDATE", "Integration", `إعداد التمويل الإعلاني: ${a.name} (${a.currency})، سقف ${cap}`, user);
     return `رُبط الحساب الإعلاني «${a.name}» (${a.currency}) — السقف الشهري ${cap}`;
+  });
+  done();
+  return r;
+}
+
+/** اختيار حساب إعلاني من ربط فيسبوك (بلا رمز منفصل) */
+export async function pickAdAccountAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const r = await run(async () => {
+    const user = await actionUser((x) => x === "ADMIN");
+    const account = String(fd.get("account") ?? "");
+    const cap = Number(fd.get("cap"));
+    if (!account.startsWith("act_") || !(cap > 0)) throw new AppError("اختر الحساب الإعلاني وحدد السقف الشهري");
+    const a = await selectMetaAdAccount(account, cap).catch((e) => {
+      throw new AppError(e instanceof Error ? e.message : "تعذر الربط");
+    });
+    await auditEvent("UPDATE", "Integration", `التمويل عبر ربط فيسبوك: ${a.name} (${a.currency})، سقف ${cap}`, user);
+    return `رُبط الحساب الإعلاني «${a.name}» من ربط فيسبوك — السقف الشهري ${cap} ${a.currency ?? ""}`;
   });
   done();
   return r;

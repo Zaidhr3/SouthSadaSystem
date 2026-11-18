@@ -14,6 +14,7 @@ import { EinvoiceSettings } from "./einvoice-settings";
 import { BrandSettings } from "./brand-settings";
 import { MetaSettings } from "./meta-settings";
 import { CanvaSettings } from "./canva-settings";
+import { AiServicesSettings } from "./ai-services-settings";
 import { getBrand } from "@/lib/brand";
 
 export const metadata = { title: "إعدادات النظام والبريد" };
@@ -54,6 +55,7 @@ export default async function SystemPage({ searchParams }: { searchParams?: { ca
           <BrandSettings {...await (async () => { const b = await getBrand(); return { slogan: b.slogan, profitRoles: [...b.profitRoles], bankRoles: [...b.bankRoles] }; })()} />
           <MetaSettings />
           <CanvaSettings notice={searchParams?.canva} />
+          <AiServicesSettings />
           <EinvoiceSettings s={einv} keysSet={jofotaraConfigured()} readiness={einvReadiness(einv)} />
           <Card title={<span className="flex items-center gap-2"><Mail className="h-5 w-5" /> التنبيهات البريدية</span>} action={configured ? <Badge tone="green"><CheckCircle2 className="h-3.5 w-3.5" /> SMTP مُعد</Badge> : <Badge tone="red"><XCircle className="h-3.5 w-3.5" /> غير مُعد</Badge>}>
             <ul className="mb-4 space-y-1.5 text-sm text-ink-soft">
