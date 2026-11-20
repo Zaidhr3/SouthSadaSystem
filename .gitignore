@@ -20,3 +20,7 @@ scripts/_diag/
 
 .claude/skills/
 graphify-out/
+
+# مجالس غرفة النقد (Roast Room) المحفوظة محلياً
+sessions/
+.claude/agents/council-*.md

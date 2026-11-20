@@ -56,6 +56,16 @@ export async function generateFromIdea(_: ActionState, fd: FormData): Promise<Ac
     const kind = (["POST", "STORY", "BOTH"].includes(t(fd, "kind")) ? t(fd, "kind") : "BOTH") as "POST" | "STORY" | "BOTH";
     const items = await fromIdea(idea, kind, user.id).catch(aiError);
     firstId = items[0]?.id ?? 0;
+    // التصميم التلقائي: المصمم الذكي يصمم كل عنصر (منشور 4:5 / ستوري 9:16) بنفسه — قابل للتعديل لاحقاً داخل النظام أو في Canva
+    if (fd.get("autoDesign") !== "off") {
+      const { smartCompose } = await import("@/lib/design/compose");
+      const res = await Promise.race([
+        Promise.allSettled(items.map((it) => smartCompose(it.id, user.id))),
+        new Promise<null>((ok) => setTimeout(() => ok(null), 150_000)),
+      ]);
+      const made = res ? res.filter((x) => x.status === "fulfilled").length : 0;
+      return made ? `صيغت الفكرة وصُمّمت (${made}) — عدّل النص والتصميم من صفحة العنصر` : "صيغت الفكرة — التصميم لم يكتمل تلقائياً، اضغط «صمّمه أنت» في صفحة العنصر";
+    }
     return "صيغت الفكرة";
   });
   if (r.ok && firstId) redirect(`/marketing/${firstId}`);

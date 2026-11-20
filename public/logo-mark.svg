@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 112" role="img" aria-label="صدى الجنوب">
+  <defs>
+    <linearGradient id="f1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5cc8f5"/><stop offset="1" stop-color="#1b8fd6"/></linearGradient>
+    <linearGradient id="f2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f8fe0"/><stop offset="1" stop-color="#1557b0"/></linearGradient>
+    <linearGradient id="f3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f62c4"/><stop offset="1" stop-color="#0c2f6e"/></linearGradient>
+    <linearGradient id="sd" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0b2545"/><stop offset="1" stop-color="#173f78"/></linearGradient>
+    <linearGradient id="arc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9aa4b2" stop-opacity=".25"/><stop offset=".45" stop-color="#6b7686"/><stop offset=".7" stop-color="#f2b134"/><stop offset="1" stop-color="#e8590c" stop-opacity=".35"/></linearGradient>
+    <linearGradient id="gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <pattern id="win" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="1.4" y="3" fill="#fff" opacity=".22"/></pattern>
+  </defs>
+  <!-- البرج 1 -->
+  <path d="M60 51l7-4.5V88l-7 4z" fill="url(#sd)"/>
+  <path d="M26 54l34-3 7-4.5-34 3z" fill="#8fdcff"/>
+  <path d="M26 54l34-3v41H26z" fill="url(#f1)"/>
+  <path d="M26 54l34-3v41H26z" fill="url(#win)"/>
+  <path d="M26 54l34-3v14L26 74z" fill="url(#gl)"/>
+  <!-- البرج 2 -->
+  <path d="M78 33l7-4.5V88l-7 4z" fill="url(#sd)"/>
+  <path d="M62 34.5l16-1.5 7-4.5-16 1.5z" fill="#6fb8ff"/>
+  <path d="M62 34.5L78 33v59H62z" fill="url(#f2)"/>
+  <path d="M62 34.5L78 33v59H62z" fill="url(#win)"/>
+  <path d="M62 34.5L78 33v18L62 58z" fill="url(#gl)"/>
+  <!-- البرج 3 -->
+  <path d="M96 15l7-4.5V88l-7 4z" fill="url(#sd)"/>
+  <path d="M80 16.5L96 15l7-4.5-16 1.5z" fill="#4e94f0"/>
+  <path d="M80 16.5L96 15v77H80z" fill="url(#f3)"/>
+  <path d="M80 16.5L96 15v77H80z" fill="url(#win)"/>
+  <path d="M80 16.5L96 15v22L80 44z" fill="url(#gl)"/>
+  <!-- قوس الأرض -->
+  <path d="M4 101c30-14 82-14 112 0-30-8.5-82-8.5-112 0z" fill="url(#arc)"/>
+</svg>

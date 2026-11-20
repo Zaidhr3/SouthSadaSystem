@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSheetDrag } from "./ios-gestures";
 import { useFormState, useFormStatus } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
@@ -514,6 +515,7 @@ export function FileInput({
 export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }) {
   // تبقى النافذة معروضة لحظة بعد الإغلاق لتنزلق للخارج بنعومة
   const [shown, setShown] = useState(open);
+  const { panel, scroller } = useSheetDrag(onClose, open);
   useEffect(() => {
     if (open) { setShown(true); return; }
     const t = window.setTimeout(() => setShown(false), 200);
@@ -533,21 +535,26 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   if (!(open || shown) || typeof document === "undefined") return null;
   return createPortal(
     <div className={clsx("fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4", !open && "modal-closing")} role="dialog" aria-modal="true" aria-label={title}>
-      <div className="modal-backdrop absolute inset-0 animate-fade-in bg-navy/45 backdrop-blur-sm" onClick={onClose} />
+      <div className="modal-backdrop absolute inset-0 animate-fade-in bg-navy/45 backdrop-blur-[3px]" onClick={onClose} />
       <div
+        ref={panel}
         className={clsx(
-          "modal-panel relative flex max-h-[92vh] w-full sheet-mobile sm:animate-pop-in flex-col overflow-hidden rounded-t-3xl bg-white shadow-pop sm:rounded-3xl",
+          "modal-panel relative flex max-h-[92dvh] w-full sheet-mobile sm:animate-pop-in flex-col overflow-hidden rounded-t-[28px] bg-white shadow-pop sm:rounded-[26px]",
           wide ? "sm:max-w-3xl" : "sm:max-w-xl",
         )}
       >
-        <span aria-hidden className="title-bar block h-1.5 w-full shrink-0" />
-        <div className="flex items-center justify-between border-b border-line bg-gradient-to-l from-gold-soft/60 via-white to-white px-5 py-4 sm:px-6">
-          <h2 className="text-lg font-extrabold text-ink">{title}</h2>
-          <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-canvas text-ink-muted transition duration-300 hover:rotate-90 hover:bg-bad-soft hover:text-bad" aria-label="إغلاق">
+        {/* مقبض السحب (الهاتف): اسحب للأسفل للإغلاق */}
+        <div data-sheet-handle className="flex shrink-0 justify-center pb-1 pt-2.5 sm:hidden" aria-hidden>
+          <span className="h-[5px] w-10 rounded-full bg-black/15" />
+        </div>
+        <div data-sheet-handle className="flex items-center justify-between gap-3 border-b border-line px-5 pb-3.5 pt-1.5 sm:px-6 sm:pt-4">
+          <h2 className="text-[17px] font-extrabold text-ink">{title}</h2>
+          <button type="button" onClick={onClose} className="hidden h-8 w-8 place-items-center rounded-full bg-canvas text-ink-muted transition duration-300 hover:rotate-90 hover:bg-bad-soft hover:text-bad sm:grid" aria-label="إغلاق">
             <X className="h-4 w-4" />
           </button>
+          <button type="button" onClick={onClose} className="text-[15px] font-bold text-accent sm:hidden">تم</button>
         </div>
-        <div className="overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
+        <div ref={scroller} className="overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">{children}</div>
       </div>
     </div>,
     document.body,

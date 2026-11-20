@@ -5,15 +5,36 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { can, see } from "@/lib/permissions";
 import { VERDICT, type Metrics } from "@/lib/social";
-import { adsConfig, metaAdAccounts, type BoostAdvice } from "@/lib/boost";
+import { adsConfig, mergeAudiences, metaAdAccounts, type Audience, type AudienceRow, type BoostAdvice } from "@/lib/boost";
 import { metaCan } from "@/lib/meta";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { ActionForm, Input, Select } from "@/components/forms";
-import { adviseBoost, decidePost, launchBoost, pickAdAccountAction, refreshAccounts, saveAdsAction } from "../../actions/social";
+import { adviseBoost, decidePost, launchBoost, pickAdAccountAction, refreshAccounts, refreshAudienceAction, saveAdsAction } from "../../actions/social";
 
 export const metadata = { title: "حساباتي — فيسبوك وإنستغرام" };
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
+
+function AudBars({ title, rows, total }: { title: string; rows: AudienceRow[]; total: number }) {
+  return (
+    <div>
+      <p className="mb-2 text-sm font-black text-navy">{title}</p>
+      {rows.length === 0 ? <p className="text-xs text-ink-muted">لا بيانات</p> : (
+        <ul className="space-y-1.5">
+          {rows.slice(0, 8).map((r) => {
+            const pct = total ? (r.reach / total) * 100 : 0;
+            return (
+              <li key={r.k} className="text-[13px]">
+                <div className="flex justify-between gap-2"><span className="font-semibold">{r.k}</span><span className="num text-ink-muted">{pct.toFixed(0)}% · {r.clicks} نقرة</span></div>
+                <div className="mt-0.5 h-2 overflow-hidden rounded-full bg-black/[0.06]"><div className="bar-grow h-full rounded-full bg-gradient-to-l from-accent to-gold" style={{ width: `${Math.max(2, pct)}%` }} /></div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export default async function AccountsPage({ searchParams }: { searchParams: { f?: string; p?: string } }) {
   const user = await requireUser(see.marketing);
@@ -55,6 +76,34 @@ export default async function AccountsPage({ searchParams }: { searchParams: { f
           )
         }
       />
+      {(() => {
+        const aud = mergeAudiences(drafts.map((d) => d.audience as unknown as Audience | null).filter((a): a is Audience => !!a));
+        const funded = drafts.filter((d) => d.adId).length;
+        if (!funded && !aud) return null;
+        const top = aud?.region[0];
+        const topAge = aud?.age[0];
+        const topGender = aud?.gender[0];
+        return (
+          <Card className="mb-4" title={<span className="flex items-center gap-2"><Rocket className="h-5 w-5 text-accent" /> من استقطبت إعلاناتك الممولة</span>} action={manage && <ActionForm action={refreshAudienceAction} submitLabel="حدّث من Meta" draft={false}><span /></ActionForm>}>
+            {!aud ? (
+              <p className="text-sm text-ink-muted">لديك {funded} إعلانات ممولة — اضغط «حدّث من Meta» لمعرفة الأعمار والجنس والمحافظات التي وصلت لها.</p>
+            ) : (
+              <>
+                <p className="mb-4 rounded-2xl bg-gold-soft p-3 text-sm font-bold leading-7 text-navy">
+                  وصلت إعلاناتك إلى <span className="num">{aud.reach.toLocaleString("en-US")}</span> شخص ({aud.clicks.toLocaleString("en-US")} نقرة، إنفاق <span className="num">{aud.spend.toFixed(2)}</span>).
+                  {top && <> أكثر جمهور من <b>{top.k}</b></>}{topAge && <>، وأكثر فئة عمرية <b className="num">{topAge.k}</b></>}{topGender && <> و<b>{topGender.k}</b> هم الأغلبية</>}.
+                </p>
+                <div className="grid gap-5 md:grid-cols-3">
+                  <AudBars title="المحافظات" rows={aud.region} total={aud.reach} />
+                  <AudBars title="الفئات العمرية" rows={aud.age} total={aud.reach} />
+                  <AudBars title="الجنس" rows={aud.gender} total={aud.reach} />
+                </div>
+                <p className="mt-3 text-xs text-ink-muted">آخر تحديث {new Date(aud.at).toLocaleString("en-GB", { timeZone: "Asia/Amman" })} — استخدمها لتوجيه الإعلان القادم للجمهور الذي تفاعل فعلاً.</p>
+              </>
+            )}
+          </Card>
+        );
+      })()}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card className="!p-4">
           <p className="flex items-center gap-2 text-sm font-bold text-[#1877f2]"><Facebook className="h-4 w-4" /> فيسبوك</p>

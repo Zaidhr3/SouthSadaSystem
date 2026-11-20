@@ -10,6 +10,7 @@ import { notify } from "@/lib/notify";
 import { saveAttachments, validateAttachments } from "@/lib/uploads";
 import { todayUTC } from "@/lib/format";
 import { pickPm } from "@/lib/quotes";
+import { createMotion, seatOf, sendFastTrackMemo } from "@/lib/board/motions";
 
 const num = (v: FormDataEntryValue | null) => {
   const s = String(v ?? "").replace(/,/g, "").trim();
@@ -71,8 +72,14 @@ export async function accountantQuote(id: number, decision: "accept" | "return",
     }
     await db.quoteRequest.update({ where: { id }, data: { status: "ADMIN_REVIEW", accountantNotes: note || q.accountantNotes } });
     await log(id, user, "AUDITED", note);
-    await notify(["ADMIN"], { title: `طلب تسعير بانتظار الاعتماد: ${q.ref}`, body: `${q.projectType} — ${q.name} — ${q.pmPrice?.toLocaleString("en-US") ?? ""} د.أ`, href: `/quotes/${id}` }, { exclude: user.id });
-    return "دُقق الطلب ورُفع للإدارة للاعتماد";
+    // بعد تدقيق المحاسب: يُرفع العرض لمجلس الإدارة للتصويت
+    const m = await createMotion({ kind: "QUOTE", refId: id, audited: true, amount: q.pmPrice, title: `عرض سعر ${q.ref}: ${q.projectType} — ${q.name}`, details: `${q.details}
+
+دراسة مدير المشروع: ${q.pmNotes ?? "—"}
+التكلفة التقديرية: ${q.pmEstimate?.toLocaleString("en-US") ?? "—"} د.أ · السعر المقترح: ${q.pmPrice?.toLocaleString("en-US") ?? "—"} د.أ${q.city ? `
+الموقع: ${q.city}` : ""}` }, user);
+    await db.boardMotion.update({ where: { id: m.id }, data: { auditNote: note || "دُقق دون ملاحظات" } });
+    return `دُقق الطلب ورُفع لمجلس الإدارة للتصويت (${m.ref})`;
   });
   done(id);
   return r;
@@ -86,6 +93,15 @@ export async function adminQuote(id: number, decision: "approve" | "reject", _: 
     const q = await load(id);
     if (q.status !== "ADMIN_REVIEW") throw new AppError("الطلب ليس بانتظار اعتماد الإدارة");
     const note = text(fd, "note");
+    // القرار لمجلس الإدارة بالتصويت — رئيس المجلس وحده يقرر فوراً بسبب مكتوب يصل للأعضاء
+    const motion = await db.boardMotion.findFirst({ where: { kind: "QUOTE", refId: id, status: { in: ["AUDIT", "VOTING"] } } });
+    if (motion) {
+      if ((await seatOf(user.id)) !== "CHAIR") throw new AppError(`هذا العرض أمام مجلس الإدارة للتصويت (${motion.ref})`, { href: `/board/${motion.id}`, label: "افتح البند وصوّت" });
+      if (note.length < 15) throw new AppError("قرار فوري دون المجلس: اكتب السبب (15 حرفاً على الأقل) — يُرسل لأعضاء المجلس كمراسلة داخلية");
+      const outcome = decision === "approve" ? "APPROVED" : "REJECTED";
+      await sendFastTrackMemo(motion, user, note, outcome);
+      await db.boardMotion.update({ where: { id: motion.id }, data: { status: outcome, decidedBy: "CHAIR_FAST", decidedById: user.id, decidedAt: new Date(), fastReason: note } });
+    }
     if (decision === "reject") {
       if (!note) throw new AppError("اكتب سبب الرفض");
       await db.quoteRequest.update({ where: { id }, data: { status: "REJECTED", adminNotes: note, decidedAt: new Date() } });

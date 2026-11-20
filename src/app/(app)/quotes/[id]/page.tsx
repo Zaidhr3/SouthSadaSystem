@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, MessageCircle, Phone, RotateCcw, ShieldAlert, Undo2, XCircle } from "lucide-react";
+import { CheckCircle2, Landmark, MessageCircle, Phone, RotateCcw, ShieldAlert, Undo2, XCircle } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { can, see } from "@/lib/permissions";
@@ -35,6 +35,11 @@ export default async function QuotePage({ params }: { params: { id: string } }) 
   const pmTurn = ["PM_REVIEW", "RETURNED"].includes(q.status) && can.handleQuotes(user.role) && (user.role === "ADMIN" || q.assignedPmId === user.id);
   const accTurn = q.status === "ACCOUNTANT_REVIEW" && can.auditQuotes(user.role);
   const adminTurn = q.status === "ADMIN_REVIEW" && can.approveQuotes(user.role);
+  const [motion, mySeat] = await Promise.all([
+    db.boardMotion.findFirst({ where: { kind: "QUOTE", refId: id, status: { in: ["AUDIT", "VOTING"] } }, select: { id: true, ref: true } }),
+    db.user.findUnique({ where: { id: user.id }, select: { boardSeat: true } }),
+  ]);
+  const isChair = mySeat?.boardSeat === "CHAIR";
   const wa = `https://wa.me/962${q.phone.replace(/^0/, "")}`;
 
   return (
@@ -133,9 +138,20 @@ export default async function QuotePage({ params }: { params: { id: string } }) 
             </Card>
           )}
 
-          {adminTurn && (
-            <Card title="اعتماد الإدارة">
+          {adminTurn && motion && (
+            <Link href={`/board/${motion.id}`} className="card card-pad pressable flex items-center gap-3 border-2 border-navy/15 bg-gradient-to-l from-gold-soft to-white">
+              <Landmark className="h-6 w-6 shrink-0 text-navy" />
+              <span className="flex-1">
+                <span className="block font-extrabold text-navy">معروض على مجلس الإدارة للتصويت — {motion.ref}</span>
+                <span className="block text-sm text-ink-muted">{isChair ? "بصفتك رئيس المجلس يمكنك القرار فوراً أدناه، وسيُرسل سببك للأعضاء تلقائياً" : "صوّت من تبويب مجلس الإدارة"}</span>
+              </span>
+              <span className="font-bold text-accent">افتح البند ←</span>
+            </Link>
+          )}
+          {adminTurn && (!motion || isChair) && (
+            <Card title={motion ? "قرار فوري من رئيس المجلس" : "اعتماد الإدارة"}>
               {q.accountantNotes && <p className="mb-3 text-sm text-ink-soft">ملاحظات المحاسب: {q.accountantNotes}</p>}
+              {motion && <p className="mb-3 rounded-xl bg-warn-soft p-3 text-sm font-semibold text-warn">القرار الفوري يتجاوز تصويت المجلس — اكتب السبب في الملاحظات (إلزامي)، ويُرسل كمراسلة داخلية لكل الأعضاء.</p>}
               <div className="grid gap-3 sm:grid-cols-2">
                 <ModalForm title="اعتماد نهائي" trigger={<><CheckCircle2 className="h-4 w-4" /> اعتماد نهائي</>} action={adminQuote.bind(null, id, "approve")}>
                   <p className="rounded-xl bg-gold-soft p-3 text-sm font-semibold leading-6">بعد الاعتماد تنتقل مباشرة لنموذج «مشروع خاص» معبأ ببيانات الطلب: تحدد المرحلة وتنشئ لصاحب المشروع حساباً (البريد + كلمة السر) ليتابع إجراءات مشروعه من البوابة — هذا هو الرد عليه.</p>

@@ -6,6 +6,10 @@ import { BOQ_CATEGORY } from "@/lib/labels";
 import { groupOccurrences, normalizeText, searchPriceHistory, type PriceGroup } from "@/lib/pricing";
 import { Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
 import clsx from "clsx";
+import { ActionForm } from "@/components/forms";
+import { indexHistorySpecs } from "../actions/boq";
+
+export const maxDuration = 120;
 
 export const metadata = { title: "مكتبة الأسعار الذكية" };
 
@@ -44,13 +48,19 @@ export default async function PricingPage({ searchParams }: { searchParams: { q?
   const q = (searchParams.q ?? "").trim();
   const cat = searchParams.cat && searchParams.cat in BOQ_CATEGORY ? searchParams.cat : undefined;
   const groups = q ? await searchPriceHistory(q, { category: cat, limit: 1000 }) : await allGroups(cat);
-  const [itemCount, tenderCount] = await Promise.all([db.boqItem.count(), db.tender.count({ where: { boqItems: { some: {} } } })]);
+  const [itemCount, tenderCount, unindexedHist] = await Promise.all([db.boqItem.count(), db.tender.count({ where: { boqItems: { some: {} } } }), db.boqItem.count({ where: { specKey: null, unitPrice: { gt: 0 } } })]);
   const multi = groups.filter((g) => g.count > 1);
   const avgAnnual = multi.length ? multi.reduce((s, g) => s + g.annualPct, 0) / multi.length : 0;
 
   return (
     <>
       <PageHeader title="مكتبة الأسعار الذكية" subtitle="كل بند سعّرته الشركة مفهرس تلقائياً — تتبع اتجاهات الأسعار وحماية هوامش الربح" />
+      {unindexedHist > 0 && (
+        <Card className="mb-5 border border-gold/50 bg-gold-soft/60">
+          <p className="mb-2 text-sm font-bold text-navy">قراءة «المواصفات المهمة» للسجل: {unindexedHist} بنداً سابقاً لم تُقرأ بعد. بعد قراءتها يظهر لك أثناء التسعير: «نفس المواصفات سُعّرت في المنطقة الفلانية بكذا».</p>
+          <ActionForm action={indexHistorySpecs} submitLabel="اقرأ الدفعة التالية (150 بنداً)" draft={false}><span /></ActionForm>
+        </Card>
+      )}
 
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="بنود مفهرسة" value={nf.format(itemCount)} sub={`من ${tenderCount} جداول كميات`} icon={Library} />

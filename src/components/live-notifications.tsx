@@ -73,10 +73,10 @@ export function LiveNotifications({ initialKeys }: { initialKeys: string[] }) {
       {perm === "default" && (
         <button
           type="button"
-          className="no-print fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] end-4 z-[60] flex items-center gap-2 rounded-full bg-ink px-4 py-2.5 text-xs font-bold text-white shadow-pop lg:bottom-6"
+          className="no-print fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] end-4 z-[35] flex items-center gap-2 rounded-full bg-ink p-3 text-xs font-bold text-white shadow-pop sm:px-4 sm:py-2.5 lg:bottom-6"
           onClick={async () => setPerm(await Notification.requestPermission())}
         >
-          <BellRing className="h-4 w-4" aria-hidden /> تفعيل إشعارات الجهاز
+          <BellRing className="h-4 w-4" aria-hidden /> <span className="sr-only sm:not-sr-only">تفعيل إشعارات الجهاز</span>
         </button>
       )}
       {popup && (

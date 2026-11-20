@@ -244,6 +244,7 @@ export const BANK_TX_CATEGORY: Record<string, string> = {
   FUND: "تمويل / عهدة",
   LOAN: "تسهيلات بنكية",
   LOAN_PAY: "سداد دين",
+  PAYROLL: "رواتب وأجور",
   OTHER: "أخرى",
 };
 

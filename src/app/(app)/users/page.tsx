@@ -22,6 +22,7 @@ function UserFields({ u }: { u?: User }) {
       <Grid>
         <Select name="role" label="الدور" options={ROLE_LABELS} defaultValue={u?.role ?? "PM"} hint="المشرف الأعلى والمراقب: اطلاع فقط دون أي تعديل" />
         <Input name="title" label="المسمى الوظيفي" defaultValue={u?.title ?? ""} />
+        <Select name="boardSeat" label="مقعد مجلس الإدارة" options={[{ value: "", label: "ليس عضواً" }, { value: "MEMBER", label: "عضو مجلس الإدارة (يصوّت)" }, { value: "CHAIR", label: "رئيس مجلس الإدارة (يصوّت ويقرر فوراً)" }]} defaultValue={u?.boardSeat ?? ""} />
       </Grid>
       <Grid>
         <Input name="phone" label="الهاتف" defaultValue={u?.phone ?? ""} dir="ltr" />

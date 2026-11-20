@@ -39,6 +39,9 @@ import { createExpense } from "../../actions/finance";
 import { TenderFields } from "../tender-fields";
 import { ClaimFields, GuaranteeFields, Lifecycle } from "./lifecycle";
 import { BoqEditor } from "./boq-editor";
+import { matchesForKeys, type SpecMatch } from "@/lib/boq-specs";
+
+const parseSpecs = (s: string | null) => { try { return s ? (JSON.parse(s) as { k: string; v: string }[]) : []; } catch { return []; } };
 import { ContractQuick } from "./contract-quick";
 import { AiBoqImport } from "./ai-boq-import";
 import { geminiConfigured, geminiModel } from "@/lib/ai/gemini";
@@ -95,6 +98,8 @@ export default async function TenderPage({ params, searchParams }: { params: { i
   const field = can.fieldOps(user.role);
   const isProject = PROJECT_STATUSES.includes(tender.status);
   const boqTotal = tender.boqItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+  // مقارنة المواصفات المهمة: نفس البصمة في عطاءات سابقة (المنطقة، السنة، السعر)
+  const specMatches = tab === "boq" ? await matchesForKeys(tender.boqItems.map((i) => i.specKey ?? ""), id) : new Map<string, SpecMatch[]>();
   const expTotal = tender.expenses.reduce((s, e) => s + e.amount, 0);
   const collected = tender.claims.reduce((s, c) => s + (c.paidAmount ?? 0), 0);
   const contract = tender.awardedValue != null ? round3(tender.awardedValue + tender.variationTotal) : null;
@@ -368,7 +373,8 @@ export default async function TenderPage({ params, searchParams }: { params: { i
             tenderId={id}
             canEdit={!tender.boqApprovedAt && (admin || (user.role === "PM" && tender.managerId === user.id))}
             showEdits={user.role !== "PM"}
-            items={tender.boqItems.map((i) => ({ id: i.id, itemNo: i.itemNo, description: i.description, category: i.category, unit: i.unit, quantity: i.quantity, unitPrice: i.unitPrice, costPrice: i.costPrice, supplier: i.supplier, specs: i.specs, source: i.source, sourcePage: i.sourcePage, sourceRef: i.sourceRef, editNote: i.editNote, editedAt: i.editedAt?.toISOString() ?? null }))}
+            unindexed={tender.boqItems.filter((i) => !i.specKey).length}
+            items={tender.boqItems.map((i) => ({ id: i.id, itemNo: i.itemNo, description: i.description, category: i.category, unit: i.unit, quantity: i.quantity, unitPrice: i.unitPrice, costPrice: i.costPrice, supplier: i.supplier, specs: i.specs, source: i.source, sourcePage: i.sourcePage, sourceRef: i.sourceRef, editNote: i.editNote, editedAt: i.editedAt?.toISOString() ?? null, keySpecs: parseSpecs(i.keySpecs), matches: (i.specKey && specMatches.get(i.specKey)) || [] }))}
           />
         </>
       )}

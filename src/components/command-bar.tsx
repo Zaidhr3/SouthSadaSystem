@@ -53,6 +53,17 @@ export function CommandBar({ name, canAsk }: { name: string; canAsk: boolean }) 
   );
 }
 
+/** حقل «اسأل المساعد» — لرأس لوحة التحكم */
+export function CommandBarInput() {
+  return (
+    <form action={async (fd) => { await askAssistant(null, {}, fd); }} className="flex items-center gap-2 rounded-2xl bg-white/95 px-2 py-1.5 shadow-card ring-1 ring-black/5">
+      <Bot className="ms-1 h-5 w-5 shrink-0 text-accent" />
+      <input name="message" required minLength={2} autoComplete="off" placeholder="اسأل المساعد… مثلاً: شو المستحق علينا هالأسبوع؟" className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-ink outline-none placeholder:text-ink-faint" />
+      <SendBtn />
+    </form>
+  );
+}
+
 /** زر المساعد العائم (للحاسوب) */
 export function AssistantFab() {
   return (

@@ -15,7 +15,7 @@ export async function bankBalance(client: Tx | typeof db = db) {
 /** حركة بنكية مرتبطة بمصدر (مطالبة/شيك/مصروف/تمويل) لضمان عدم التكرار */
 export async function upsertLinkedBankTx(
   tx: Tx,
-  sourceType: "CLAIM" | "CHEQUE" | "EXPENSE" | "FUND" | "TAX" | "LOAN" | "LOAN_PAY",
+  sourceType: "CLAIM" | "CHEQUE" | "EXPENSE" | "FUND" | "TAX" | "LOAN" | "LOAN_PAY" | "PAYROLL",
   sourceId: number,
   data: { date: Date; type: "IN" | "OUT"; amount: number; description: string; tenderId?: number | null },
 ) {

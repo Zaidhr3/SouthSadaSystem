@@ -160,3 +160,69 @@ export async function createBoost(postId: string, opts: { daily: number; days: n
     throw e;
   }
 }
+
+/**
+ * «من استقطبت إعلاناتك»: نتائج كل إعلان ممول من Meta Insights مقسمة حسب العمر والجنس والمحافظة
+ * (الوصول والنقرات والتفاعل والإنفاق) — تُحفظ مع التمويل وتُجمع في لوحة الجمهور.
+ */
+export type AudienceRow = { k: string; reach: number; clicks: number; engagement: number; spend: number };
+export type Audience = { age: AudienceRow[]; gender: AudienceRow[]; region: AudienceRow[]; reach: number; clicks: number; spend: number; at: string };
+
+type InsightRow = { reach?: string; clicks?: string; spend?: string; actions?: { action_type: string; value: string }[]; age?: string; gender?: string; region?: string };
+const GENDER_AR: Record<string, string> = { male: "ذكور", female: "إناث", unknown: "غير محدد" };
+
+function rows(data: InsightRow[], key: "age" | "gender" | "region"): AudienceRow[] {
+  const m = new Map<string, AudienceRow>();
+  for (const r of data) {
+    const raw = r[key] ?? "—";
+    const k = key === "gender" ? GENDER_AR[raw] ?? raw : raw.replace(/ Governorate$/i, "");
+    const cur = m.get(k) ?? { k, reach: 0, clicks: 0, engagement: 0, spend: 0 };
+    cur.reach += Number(r.reach || 0);
+    cur.clicks += Number(r.clicks || 0);
+    cur.spend += Number(r.spend || 0);
+    cur.engagement += Number(r.actions?.find((a) => a.action_type === "post_engagement")?.value || 0);
+    m.set(k, cur);
+  }
+  return Array.from(m.values()).sort((a, b) => b.reach - a.reach);
+}
+
+export async function fetchAudience(adId: string): Promise<Audience> {
+  const cfg = await adsConfig();
+  if (!cfg) throw new Error("التمويل غير مُعد");
+  const q = (breakdowns: string) => ads<{ data: InsightRow[] }>("GET", `${adId}/insights`, { fields: "reach,clicks,spend,actions", breakdowns, date_preset: "maximum", limit: "200" }, cfg.token);
+  const [ag, rg, tot] = await Promise.all([q("age,gender"), q("region"), ads<{ data: InsightRow[] }>("GET", `${adId}/insights`, { fields: "reach,clicks,spend", date_preset: "maximum" }, cfg.token)]);
+  const t = tot.data?.[0] ?? {};
+  return { age: rows(ag.data ?? [], "age"), gender: rows(ag.data ?? [], "gender"), region: rows(rg.data ?? [], "region").slice(0, 12), reach: Number(t.reach || 0), clicks: Number(t.clicks || 0), spend: Number(t.spend || 0), at: new Date().toISOString() };
+}
+
+/** تحديث جمهور كل الإعلانات الممولة (النشطة والمنتهية خلال 60 يوماً) */
+export async function refreshAudiences() {
+  const list = await db.adBoost.findMany({ where: { adId: { not: null }, status: { in: ["ACTIVE", "DONE", "PAUSED"] }, createdAt: { gte: new Date(Date.now() - 60 * 86400_000) } }, take: 20 });
+  let ok = 0;
+  const errors: string[] = [];
+  for (const b of list) {
+    try {
+      const aud = await fetchAudience(b.adId!);
+      await db.adBoost.update({ where: { id: b.id }, data: { audience: JSON.parse(JSON.stringify(aud)) } });
+      ok++;
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  return { ok, total: list.length, error: errors[0] };
+}
+
+/** دمج جمهور عدة إعلانات في صورة واحدة */
+export function mergeAudiences(list: Audience[]): Audience | null {
+  if (!list.length) return null;
+  const merge = (pick: (a: Audience) => AudienceRow[]) => {
+    const m = new Map<string, AudienceRow>();
+    list.flatMap(pick).forEach((r) => {
+      const c = m.get(r.k) ?? { k: r.k, reach: 0, clicks: 0, engagement: 0, spend: 0 };
+      c.reach += r.reach; c.clicks += r.clicks; c.engagement += r.engagement; c.spend += r.spend;
+      m.set(r.k, c);
+    });
+    return Array.from(m.values()).sort((a, b) => b.reach - a.reach);
+  };
+  return { age: merge((a) => a.age), gender: merge((a) => a.gender), region: merge((a) => a.region).slice(0, 10), reach: list.reduce((s, a) => s + a.reach, 0), clicks: list.reduce((s, a) => s + a.clicks, 0), spend: list.reduce((s, a) => s + a.spend, 0), at: list.map((a) => a.at).sort().pop()! };
+}

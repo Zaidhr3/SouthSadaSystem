@@ -327,3 +327,294 @@ div:has(> .input:focus) > .label, div:has(> div > .input:focus) > .label { color
   background: #fff; box-shadow: 0 0 12px rgba(242, 177, 52, 0.9);
 }
 @media print { .page-hero { background: none; border: 0; box-shadow: none; padding: 0; } .page-hero::before, .page-hero::after { display: none; } }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   الإصدار 4 — «المكتب التنفيذي»: هوية أهدأ وأحدّ (كحلي + ذهبي) بطابع احترافي
+   - خلفية دافئة ثابتة بلا رسوم متحركة مستمرة (أسرع وأوفر للبطارية)
+   - رأس زجاجي بساعة حية، شريط جانبي بمجموعات قابلة للطي، بطاقات أنظف
+   - الهاتف: رأس iOS يتحول لزجاج عند التمرير، أوراق سفلية تُسحب للإغلاق، سحب من الحافة للرجوع
+   ═════════════════════════════════════════════════════════════════════════════ */
+html { background-color: #f4f1eb; }
+body {
+  background-image:
+    radial-gradient(1200px 520px at 100% -8%, rgba(242, 177, 52, 0.10), transparent 62%),
+    radial-gradient(900px 600px at -8% 108%, rgba(29, 78, 137, 0.07), transparent 60%);
+}
+body::before { animation: none !important; opacity: .55; }
+
+/* الشريط الجانبي */
+.sidebar-navy {
+  background:
+    radial-gradient(380px 240px at 100% 0%, rgba(242, 177, 52, 0.14), transparent 70%),
+    radial-gradient(320px 280px at 0% 100%, rgba(232, 89, 12, 0.10), transparent 70%),
+    linear-gradient(180deg, #0a2140 0%, #0d2a50 50%, #091c36 100%);
+}
+.nav-active { background: linear-gradient(100deg, #f7c55a 0%, #f2b134 55%, #f59f0b 100%) !important; animation: none !important; box-shadow: 0 8px 20px -10px rgba(242, 177, 52, .8), inset 0 1px 0 rgba(255,255,255,.45); }
+.nav-active::before { inset-inline-start: -12px; inset-block: 9px; width: 4px; background: #f2b134; box-shadow: 0 0 14px rgba(242, 177, 52, .9); }
+
+/* شريط الرأس (الحاسوب) */
+.topbar {
+  background: rgba(244, 241, 235, 0.78);
+  -webkit-backdrop-filter: saturate(1.6) blur(18px);
+          backdrop-filter: saturate(1.6) blur(18px);
+  border-bottom: 1px solid rgba(19, 32, 58, 0.06);
+}
+.clock-colon { animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { opacity: .25; } }
+
+/* رأس الهاتف بنمط iOS */
+.ios-header {
+  height: calc(56px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  background: rgba(244, 241, 235, 0);
+  transition: background-color .25s ease, box-shadow .25s ease;
+}
+.ios-header-scrolled {
+  background: rgba(248, 246, 242, 0.82);
+  -webkit-backdrop-filter: saturate(1.8) blur(20px);
+          backdrop-filter: saturate(1.8) blur(20px);
+  box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.16);
+}
+
+/* البطاقات */
+.card {
+  border-radius: 20px;
+  border-color: rgba(19, 32, 58, 0.07);
+  box-shadow: 0 1px 1px rgba(19, 32, 58, 0.03), 0 6px 18px -10px rgba(19, 32, 58, 0.14);
+}
+@media (hover: hover) {
+  .card:hover { box-shadow: 0 0 0 1px rgba(242, 177, 52, 0.22), 0 1px 2px rgba(19, 32, 58, 0.04), 0 16px 34px -20px rgba(11, 37, 69, 0.28); }
+}
+
+/* رأس الصفحة: نظيف بلا صندوق — عنوان كبير ووصف وإجراءات */
+.page-hero {
+  padding: 4px 2px 18px; border-radius: 0; background: none; border: 0; box-shadow: none;
+  border-bottom: 1px solid rgba(19, 32, 58, 0.07);
+}
+.page-hero::before { display: none; }
+.page-hero::after { display: none; }
+
+/* التبويبات: تحكم مقسّم بنمط iOS */
+.seg { background: rgba(19, 32, 58, 0.06); }
+
+/* الجداول */
+.tbl th { background: #f8f6f1; color: #5a6378; letter-spacing: .01em; }
+.tbl tbody tr:nth-child(even) { background-color: rgba(244, 241, 235, 0.38); }
+.tbl tbody tr:hover { box-shadow: inset -3px 0 0 #f2b134; }
+
+/* شريط التبويب السفلي */
+.tabbar { background: rgba(250, 248, 244, 0.86); border-top-color: rgba(0, 0, 0, 0.1); }
+.tab-active { color: #0b2545; }
+.tab-active svg { color: #e8590c; }
+
+/* ظل الصفحة أثناء السحب للرجوع */
+.swipe-shade { position: fixed; inset: 0; z-index: 25; background: #0b2545; opacity: 0; pointer-events: none; }
+.app-main { background: transparent; }
+
+/* إحساس iOS: لا تحديد نص عند الضغط المطوّل على الأزرار والروابط، وتمرير سلس */
+@media (pointer: coarse) {
+  a, button, .tab, .pressable { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  html { -webkit-overflow-scrolling: touch; }
+}
+@media (max-width: 1023px) { .page-hero h1 { font-size: 28px; line-height: 1.2; } }
+@media print { .topbar, .ios-header { display: none !important; } }
+
+/* رأس لوحة التحكم التنفيذي */
+.hero-exec {
+  background:
+    radial-gradient(520px 260px at 100% 0%, rgba(242, 177, 52, 0.28), transparent 70%),
+    radial-gradient(420px 300px at 0% 120%, rgba(232, 89, 12, 0.22), transparent 70%),
+    linear-gradient(150deg, #0b2545 0%, #13315c 55%, #0a1f3b 100%);
+}
+.hero-exec::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(242,177,52,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(242,177,52,.07) 1px, transparent 1px);
+  background-size: 30px 30px;
+  -webkit-mask-image: linear-gradient(270deg, #000, transparent 70%); mask-image: linear-gradient(270deg, #000, transparent 70%);
+}
+@media print { .hero-exec { display: none; } }
+
+/* ═════ درجات الرمادي المريحة للعين (بدل الأبيض الساطع في وسط الواجهات) ═════ */
+html { background-color: #e3e6ea; }
+body {
+  background-image:
+    radial-gradient(1200px 520px at 100% -8%, rgba(242, 177, 52, 0.07), transparent 62%),
+    radial-gradient(900px 600px at -8% 108%, rgba(29, 78, 137, 0.06), transparent 60%);
+}
+.card { background-color: #f1f3f5; border-color: rgba(19, 32, 58, 0.08); }
+.app-main .bg-white, [role="dialog"] .bg-white { background-color: #f1f3f5; }
+.modal-panel { background-color: #eef0f3 !important; }
+.input, select.input, textarea.input { background-color: #f8f9fa; border-color: #d5d9df; }
+.input:focus { background-color: #fbfbfc; }
+.btn-secondary { background-color: #e9ecef; border-color: #d3d8de; }
+.tbl th { background: #e6e9ed; }
+.tbl tbody tr:nth-child(even) { background-color: rgba(214, 219, 225, 0.35); }
+.topbar { background: rgba(227, 230, 234, 0.82); }
+.ios-header-scrolled { background: rgba(229, 232, 236, 0.86); }
+.tabbar { background: rgba(233, 236, 239, 0.9); }
+.seg { background: rgba(19, 32, 58, 0.08); }
+
+/* ═════ الزجاج بنمط Apple (Liquid Glass): ألواح شفافة مُغبّشة بحواف مضيئة، فوق خلفية رمادية بأضواء ناعمة ═════ */
+:root {
+  --glass-bg: rgba(242, 244, 247, 0.58);
+  --glass-bg-strong: rgba(238, 241, 245, 0.78);
+  --glass-edge: rgba(255, 255, 255, 0.65);
+  --glass-blur: saturate(1.8) blur(22px);
+}
+html { background-color: #dde1e6; }
+/* أضواء ثابتة خلف الزجاج (لا تتحرك مع التمرير — مثل خلفية iOS) */
+body::before {
+  opacity: 1 !important; inset: 0 !important;
+  background:
+    radial-gradient(38% 34% at 88% 8%, rgba(242, 177, 52, 0.30), transparent 70%),
+    radial-gradient(34% 34% at 8% 30%, rgba(29, 78, 137, 0.22), transparent 70%),
+    radial-gradient(36% 32% at 70% 78%, rgba(232, 89, 12, 0.14), transparent 70%),
+    radial-gradient(30% 30% at 20% 92%, rgba(15, 157, 138, 0.14), transparent 70%) !important;
+}
+.card, .glass-panel {
+  background: var(--glass-bg) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+          backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), inset 0 -1px 0 rgba(19, 32, 58, 0.04), 0 10px 30px -14px rgba(11, 37, 69, 0.25) !important;
+}
+.app-main .bg-white, [role="dialog"] .bg-white { background-color: rgba(250, 251, 252, 0.6) !important; }
+.modal-panel, .sheet-mobile, [role="dialog"] .shadow-pop {
+  background-color: var(--glass-bg-strong) !important;
+  -webkit-backdrop-filter: saturate(1.8) blur(30px);
+          backdrop-filter: saturate(1.8) blur(30px);
+}
+.input, select.input, textarea.input { background-color: rgba(255, 255, 255, 0.55); border-color: rgba(19, 32, 58, 0.12); }
+.input:focus { background-color: rgba(255, 255, 255, 0.85); }
+.btn-secondary { background-color: rgba(255, 255, 255, 0.5); border-color: rgba(19, 32, 58, 0.1); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.seg { background: rgba(255, 255, 255, 0.35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border: 1px solid rgba(255, 255, 255, 0.5); }
+.tbl th { background: rgba(225, 229, 234, 0.7); }
+.tbl tbody tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.22); }
+.topbar { background: rgba(225, 229, 234, 0.55); -webkit-backdrop-filter: saturate(1.8) blur(24px); backdrop-filter: saturate(1.8) blur(24px); border-bottom-color: rgba(255, 255, 255, 0.5); }
+.ios-header-scrolled { background: rgba(225, 229, 234, 0.6); -webkit-backdrop-filter: saturate(1.8) blur(24px); backdrop-filter: saturate(1.8) blur(24px); }
+.tabbar, .glass { background: rgba(232, 235, 239, 0.62) !important; -webkit-backdrop-filter: saturate(1.8) blur(24px) !important; backdrop-filter: saturate(1.8) blur(24px) !important; border-top-color: rgba(255, 255, 255, 0.55); }
+/* الشريط الجانبي زجاج كحلي */
+.sidebar-navy { box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06); }
+.hero-exec { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 22px 50px -24px rgba(11, 37, 69, 0.6); }
+
+/* أشرطة التمرير بنمط macOS/iOS: رفيعة، شفافة، بلا مسار */
+* { scrollbar-width: thin; scrollbar-color: rgba(19, 32, 58, 0.28) transparent; }
+::-webkit-scrollbar { width: 9px; height: 9px; background: transparent; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(19, 32, 58, 0.22); border-radius: 99px; border: 2.5px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(19, 32, 58, 0.42); }
+.sidebar-navy * { scrollbar-color: rgba(255, 255, 255, 0.22) transparent; }
+.sidebar-navy ::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.2); }
+html { scroll-behavior: smooth; }
+/* تمرير أفقي ناعم بالالتقاط (الجداول والشرائح) مثل iOS */
+.overflow-x-auto { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+@media (pointer: coarse) { ::-webkit-scrollbar { width: 0; height: 0; } }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card, .glass-panel { background: #f1f3f5 !important; }
+}
+
+/* ═════ التنقل بنمط iOS الحديث ═════ */
+/* دفع صفحة داخل قسم (RTL: تدخل من اليسار) */
+@keyframes ios-push { from { transform: translate3d(-38%, 0, 0); opacity: 0.35; } to { transform: none; opacity: 1; } }
+/* الرجوع: الصفحة السابقة تعود من إزاحة بارالاكس */
+@keyframes ios-pop { from { transform: translate3d(26%, 0, 0); opacity: 0.5; } to { transform: none; opacity: 1; } }
+/* بين الأقسام الرئيسية: تلاشٍ مع تكبير خفيف */
+@keyframes ios-fade { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: none; } }
+.page-push { animation: ios-push .52s cubic-bezier(.2, .9, .25, 1) both; will-change: transform, opacity; }
+.page-pop { animation: ios-pop .46s cubic-bezier(.2, .9, .25, 1) both; will-change: transform, opacity; }
+.page-fade { animation: ios-fade .32s ease-out both; }
+.app-main { overflow-x: clip; }
+
+/* «العدسة» المنزلقة في التبويبات المقسّمة */
+.seg-lens {
+  position: absolute; top: 0; bottom: 0; right: auto; left: 0; z-index: 0; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 3px rgba(0,0,0,.1), 0 4px 12px -4px rgba(11,37,69,.18);
+  transition: transform .5s cubic-bezier(.3, 1.35, .45, 1), width .5s cubic-bezier(.3, 1.35, .45, 1);
+}
+
+/* شريط التبويب العائم بزجاج iOS 26 */
+.tabbar {
+  left: 12px !important; right: 12px !important; bottom: max(10px, env(safe-area-inset-bottom)) !important;
+  padding: 6px !important; border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 12px 34px -12px rgba(11, 37, 69, 0.38);
+}
+.tab { position: relative; z-index: 1; min-height: 54px; border-radius: 24px; transition: color .3s ease, transform .45s var(--spring); }
+.tab-lens {
+  position: absolute; top: 6px; bottom: 6px; right: 6px; z-index: 0; border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 2px 8px -2px rgba(11,37,69,.18);
+  transition: transform .55s cubic-bezier(.3, 1.4, .45, 1);
+}
+.tab-primary > span:first-child { margin-top: 0 !important; height: 40px; width: 40px; box-shadow: 0 6px 16px -6px rgba(232,89,12,.7); --tw-ring-shadow: 0 0 #0000 !important; }
+@media (prefers-reduced-motion: reduce) { .page-push, .page-pop, .page-fade { animation: none; } }
+
+/* خلفية النظام الشخصية: ثابتة خلف الزجاج، مع طبقة رمادية خفيفة تحفظ وضوح النصوص */
+.user-wallpaper { position: fixed; inset: 0; z-index: -2; pointer-events: none; }
+.user-wallpaper::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(226, 230, 235, 0.62), rgba(221, 225, 230, 0.5)); }
+body:has(.user-wallpaper)::before { opacity: .35 !important; }
+
+/* ═════════════ الإصدار 5 — «المفخرة»: رمادي فاخر، خط أكبر، شريط جانبي ملكي ═════════════ */
+/* الخلفية: درجات السكني (بلاتيني) مع لمعة ضوء ناعمة — ثابتة خلف الزجاج */
+html { background: #d9dde2; }
+body::before {
+  background:
+    radial-gradient(55% 45% at 92% 0%, rgba(255, 255, 255, 0.85), transparent 62%),
+    radial-gradient(45% 40% at 0% 100%, rgba(140, 150, 165, 0.35), transparent 65%),
+    radial-gradient(35% 30% at 70% 85%, rgba(242, 177, 52, 0.10), transparent 70%),
+    linear-gradient(165deg, #e8eaed 0%, #d5d9df 55%, #c6ccd3 100%) !important;
+  opacity: 1 !important;
+}
+
+/* ── الطباعة: كل شيء أكبر وأوضح ── */
+@media (min-width: 1024px) { html { font-size: 17px; } }
+body { font-size: 16px; line-height: 1.75; }
+.page-hero h1 { font-size: 40px !important; font-weight: 900; letter-spacing: -0.02em; }
+@media (max-width: 1023px) { .page-hero h1 { font-size: 31px !important; } }
+.page-hero h1 + div, .page-hero h1 ~ div { font-size: 16px; }
+.card h2 { font-size: 20px !important; font-weight: 900; color: #0b2545; }
+.label { font-size: 14.5px; font-weight: 800; color: #2b3650; }
+.input, select.input, textarea.input { font-size: 16px; padding-block: 12px; border-radius: 14px; }
+.btn { font-size: 15px; padding: 10px 20px; font-weight: 800; }
+.btn-sm { font-size: 14px; padding: 7px 14px; }
+.tbl { font-size: 15px; }
+.tbl th { font-size: 13.5px; font-weight: 900; color: #3f4a60; padding-block: 13px; }
+.tbl td { padding-block: 14px; }
+.seg a { font-size: 15.5px !important; padding: 9px 18px !important; }
+.num { letter-spacing: -0.01em; }
+/* خطوط فاصلة أوضح وأفخم */
+.card { border-width: 1px; }
+.page-hero { border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, transparent, rgba(242,177,52,.55) 30%, rgba(11,37,69,.25) 70%, transparent) 1; }
+.tbl th { border-bottom: 2px solid rgba(11, 37, 69, 0.12) !important; }
+
+/* ── الشريط الجانبي الملكي ── */
+.sidebar-grand {
+  background:
+    radial-gradient(420px 300px at 100% 0%, rgba(242, 177, 52, 0.20), transparent 70%),
+    radial-gradient(380px 320px at 0% 100%, rgba(232, 89, 12, 0.12), transparent 70%),
+    linear-gradient(180deg, #071a33 0%, #0b2545 38%, #0c284c 70%, #06162b 100%) !important;
+  box-shadow: inset -1px 0 0 rgba(242, 177, 52, 0.28), 8px 0 40px -18px rgba(6, 22, 43, 0.6);
+}
+.sidebar-grand::after { /* خط ذهبي رفيع على حافة الشريط */
+  content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; width: 2px; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(242,177,52,.75) 25%, rgba(232,89,12,.6) 60%, transparent);
+}
+.sb-gold-text {
+  background: linear-gradient(100deg, #b9862a 0%, #f7d98b 35%, #f2b134 55%, #ffe7a6 75%, #c8922e 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.sb-logo { box-shadow: 0 0 0 2px #f2b134, 0 0 0 5px rgba(242, 177, 52, 0.18), 0 14px 30px -10px rgba(0, 0, 0, 0.6); }
+.sb-rule { height: 1px; background: linear-gradient(90deg, rgba(242,177,52,.0), rgba(242,177,52,.55), rgba(242,177,52,.0)); }
+.sb-brand { border-bottom: 1px solid rgba(242, 177, 52, 0.16); margin-bottom: 12px; }
+.sb-foot { border-top: 1px solid rgba(242, 177, 52, 0.16); }
+.sidebar-grand .nav-link:not(.nav-active):hover { box-shadow: inset 0 0 0 1px rgba(242, 177, 52, 0.18); }
+.sidebar-grand .nav-active {
+  background: linear-gradient(100deg, #ffe08f 0%, #f7c55a 35%, #f2b134 65%, #e99a1c 100%) !important;
+  box-shadow: 0 10px 26px -10px rgba(242, 177, 52, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -2px 0 rgba(160, 100, 10, 0.25) !important;
+  font-weight: 900;
+}
+.sidebar-grand .nav-active::before { inset-inline-start: -16px; width: 5px; inset-block: 10px; }
+.sidebar-grand .sb-icon { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+
+/* شريط الرأس أعرض وأفخم */
+.topbar { border-bottom: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 1px 0 rgba(11, 37, 69, 0.06), 0 10px 30px -24px rgba(11, 37, 69, 0.4); }

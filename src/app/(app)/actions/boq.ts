@@ -10,6 +10,7 @@ import { BOQ_CATEGORY } from "@/lib/labels";
 import { normalizeText, searchPriceHistory, type PriceGroup } from "@/lib/pricing";
 import { notify } from "@/lib/notify";
 import { fmtJOD } from "@/lib/format";
+import { indexSpecs, matchTyped, type SpecMatch } from "@/lib/boq-specs";
 import { formObject, zEnum, zMoney, zOptMoney, zOptText, zPositiveMoney, zText } from "@/lib/validation";
 
 const itemSchema = z.object({
@@ -70,7 +71,7 @@ export async function updateBoqItem(id: number, _: ActionState, fd: FormData): P
       data.quantity !== current.quantity && `الكمية ${current.quantity}←${data.quantity}`,
     ].filter(Boolean).join("، ");
     const flag = user.role === "PM" && current.source === "AI" && changes ? { editedById: user.id, editedAt: new Date(), editNote: changes } : {};
-    const item = await db.boqItem.update({ where: { id }, data: { ...data, ...flag, normalized: normalizeText(data.description) } });
+    const item = await db.boqItem.update({ where: { id }, data: { ...data, ...flag, normalized: normalizeText(data.description), ...(changes || data.specs !== undefined ? { specKey: null, keySpecs: null } : {}) } });
     revalidatePath(`/tenders/${item.tenderId}`);
     return "تم تحديث البند";
   });
@@ -157,4 +158,48 @@ export async function lookupPriceHistory(query: string, tenderId?: number): Prom
   if (query.trim().length < 2) return [];
   const groups = await searchPriceHistory(query, { excludeTenderId: tenderId, limit: 200 });
   return groups.slice(0, 6).map((g) => ({ ...g, occurrences: g.occurrences.slice(0, 8) }));
+}
+
+/** استخراج «المواصفات المهمة» لبنود العطاء بالذكاء الاصطناعي ومقارنتها بكل العطاءات السابقة */
+export async function indexTenderSpecs(tenderId: number): Promise<ActionState> {
+  return run(async () => {
+    const user = await actionUser(undefined, { readOnlyOk: false });
+    if (!can.viewAll(user.role) && user.role !== "PM") throw new AppError("ليست لديك صلاحية");
+    if (user.role === "PM") {
+      const t = await db.tender.findUnique({ where: { id: tenderId }, select: { managerId: true } });
+      if (t?.managerId !== user.id) throw new AppError("هذا العطاء غير مسند إليك");
+    }
+    let total = 0;
+    for (let i = 0; i < 5; i++) {
+      const r = await indexSpecs({ tenderId }, 90);
+      total += r.done;
+      if (!r.left) break;
+    }
+    revalidatePath(`/tenders/${tenderId}`);
+    return total ? `قُرئت المواصفات المهمة لـ ${total} بنداً وقورنت بالعطاءات السابقة` : "كل البنود مقروءة مسبقاً";
+  });
+}
+
+/** فهرسة السجل التاريخي (البنود المسعّرة في العطاءات السابقة) دفعة بعد دفعة */
+export async function indexHistorySpecs(): Promise<ActionState> {
+  return run(async () => {
+    const user = await actionUser();
+    if (!can.viewAll(user.role)) throw new AppError("ليست لديك صلاحية");
+    const r = await indexSpecs({}, 150);
+    revalidatePath("/pricing");
+    return r.done ? `فُهرس ${r.done} بنداً${r.left ? ` — بقي ${r.left} (اضغط مرة أخرى)` : " — اكتمل السجل"}` : "السجل مفهرس بالكامل";
+  });
+}
+
+/** أثناء الكتابة: نفس المواصفات في عطاءات سابقة (بالمنطقة والسنة والسعر) */
+export async function lookupSpecMatches(description: string, unit: string, tenderId?: number): Promise<{ specs: { k: string; v: string }[]; matches: SpecMatch[]; error?: string }> {
+  try {
+    const user = await actionUser(undefined, { readOnlyOk: true });
+    if (!can.viewAll(user.role) && user.role !== "PM") return { specs: [], matches: [] };
+    if (description.trim().length < 8) return { specs: [], matches: [] };
+    const r = await matchTyped(description.slice(0, 800), unit, tenderId);
+    return { specs: r.specs, matches: r.matches };
+  } catch (e) {
+    return { specs: [], matches: [], error: e instanceof Error ? e.message : "تعذر قراءة المواصفات" };
+  }
 }

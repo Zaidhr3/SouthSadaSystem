@@ -112,7 +112,8 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
           <Card title={<span className="flex items-center gap-2"><Lightbulb className="h-5 w-5 text-gold" /> عندي فكرة</span>}>
             <ActionForm action={generateFromIdea} submitLabel="صِغها باحتراف">
               <Textarea name="idea" label="الفكرة بكلماتك" rows={3} required placeholder="مثال: صبّينا اليوم سقف فيلا عبدون والعمال اشتغلوا من الفجر" />
-              <Select name="kind" label="الشكل" options={[{ value: "BOTH", label: "منشور + قصة" }, { value: "POST", label: "منشور دائم" }, { value: "STORY", label: "قصة يومية" }]} defaultValue="BOTH" />
+              <Select name="kind" label="الشكل" options={[{ value: "POST", label: "منشور (4:5 — 1080×1350)" }, { value: "STORY", label: "ستوري (9:16 — 1080×1920)" }, { value: "BOTH", label: "منشور + ستوري" }]} defaultValue="POST" />
+              <Select name="autoDesign" label="التصميم" options={[{ value: "on", label: "صمّمه تلقائياً الآن (المصمم الذكي)" }, { value: "off", label: "النص فقط — أصمم لاحقاً" }]} defaultValue="on" hint="بعدها تقدر تعدّل العنوان والنص والقالب داخل النظام، أو تفتحه في Canva وتعدل عليه وترجعه" />
             </ActionForm>
           </Card>
           <Card title={<span className="flex items-center gap-2"><Radar className="h-5 w-5 text-navy-3" /> رادار الأحداث</span>}>

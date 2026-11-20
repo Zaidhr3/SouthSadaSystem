@@ -32,13 +32,14 @@ export const HOOK_PROMPT = `صيغ الخطاف الـ21 (مهارة li-post) �
 
 export const PLAN_PROMPT = `منهجية الخطة الأسبوعية (مهارة li-plan): نوّع الأنواع ولا تكرر نوعين متتاليين — دليل/إنجاز برقم (أسبوعياً)، رأي مهني جريء (أسبوعياً)، تعليم: شيء يفعله المالك اليوم (أسبوعياً)، قصة: مشهد بحوار وكلفة (كل أسبوعين)، عرض: ما نبيعه بوضوح بلا اعتذار (كل أسبوعين). لكل عنصر زاوية محددة مما حدث فعلاً لا موضوعاً عاماً، ورقم صيغة الخطاف المناسبة. أفضل أوقات جمهور المالكين في الأردن: المساء 8–10 والجمعة صباحاً — والسطر الأول أهم من التوقيت.`;
 
-export type SkillId = "humanize" | "hooks" | "post" | "carousel" | "repurpose" | "reply" | "comment" | "dm" | "inbox" | "audit" | "profile";
+export type SkillId = "humanize" | "hooks" | "post" | "carousel" | "ads" | "repurpose" | "reply" | "comment" | "dm" | "inbox" | "audit" | "profile";
 export type SkillDef = { id: SkillId; source: string; name: string; desc: string; scope: "item" | "free"; inputLabel?: string; placeholder?: string };
 
 export const SKILLS: SkillDef[] = [
   { id: "humanize", source: "li-human", name: "المؤنسن", desc: "يعيد كتابة الأسطر الموسومة بالبصمة الآلية مع الحفاظ على المعنى، ثم يفحص بالخماسية", scope: "item" },
   { id: "hooks", source: "li-post", name: "3 خطافات بديلة", desc: "ثلاث افتتاحيات من ثلاث صيغ مختلفة من الـ21، مع ترشيح الأقوى", scope: "item" },
   { id: "post", source: "li-post", name: "إعادة البناء كمنشور", desc: "خطاف ← مكافأة ← فقرات قصيرة ← انعطافة ← خاتمة واحدة", scope: "item" },
+  { id: "ads", source: "ad-creative + ads-copy-ar", name: "إعلان ممول عربي + إنجليزي", desc: "5 زوايا إعلانية (مباشر، ألم، نتيجة، فضول، قصير UGC) بنسخة عربية وإنجليزية، مع عناوين Meta ونصوص CTA والجمهور المقترح — من الحقائق فقط", scope: "item" },
   { id: "carousel", source: "li-carousel", name: "كاروسيل إنستغرام", desc: "يحوّل الفكرة إلى شرائح متسلسلة (غلاف، شرائح، خاتمة) مع نص كل شريحة وتوجيهها البصري", scope: "item" },
   { id: "repurpose", source: "li-repurpose", name: "إعادة التدوير", desc: "يستخرج من نص طويل (محضر، مقابلة، تقرير) ادعاءات وأرقاماً وقصصاً تصلح 4–6 منشورات للأسبوع", scope: "free", inputLabel: "النص الطويل", placeholder: "الصق محضر اجتماع، تقرير موقع، مقابلة..." },
   { id: "reply", source: "li-reply", name: "الرد على التعليقات", desc: "يفرز تعليقات منشورنا (عميل محتمل، مضمون، زميل، دعم، إزعاج) ويكتب رداً لكل فئة", scope: "free", inputLabel: "التعليقات", placeholder: "الصق التعليقات مع أسماء أصحابها" },
@@ -76,7 +77,7 @@ const SYS = `أنت فريق المحتوى في «صدى الجنوب للمق�
 
 export async function runSkill(id: SkillId, input: { caption?: string; kind?: string; text?: string }): Promise<SkillOutput> {
   const out = await runSkillRaw(id, input);
-  return id === "humanize" || id === "hooks" || id === "post" ? guard(input.caption, out) : out;
+  return id === "humanize" || id === "hooks" || id === "post" || id === "ads" ? guard(input.caption, out) : out;
 }
 
 async function runSkillRaw(id: SkillId, input: { caption?: string; kind?: string; text?: string }): Promise<SkillOutput> {
@@ -103,6 +104,39 @@ async function runSkillRaw(id: SkillId, input: { caption?: string; kind?: string
     return {
       text: `الترشيح: الخيار ${data.pick} — ${data.why}`,
       options: (data.options ?? []).slice(0, 3).map((o) => ({ label: hookName(o.formula), text: humanizeClean(`${o.hook}\n${body}`).text })),
+    };
+  }
+  if (id === "ads") {
+    const { data } = await writeJson<{ angles: { angle: string; ar: string; en: string; headlineAr: string; headlineEn: string; cta: string }[]; audience: string; notes: string }>({
+      system: `${SYS}
+أنت أيضاً كاتب إعلانات Direct Response محترف بالعربية والإنجليزية لإعلانات Meta الممولة (مهارتا ad-creative وads-copy-ar).
+البنية لكل إعلان: Hook قوي ← المشكلة ← الوعد/الحل ← الإثبات (من الحقائق فقط) ← CTA واحد.
+حدود Meta: النص الأساسي يظهر منه ~125 حرفاً قبل «المزيد» فاجعل أول سطر يكفي وحده؛ العنوان ≤ 40 حرفاً.
+الإنجليزية ليست ترجمة حرفية: اكتبها لقارئ إنجليزي (مغتربون، شركات، جهات) بنفس الحقائق.
+ممنوع الوعود غير القابلة للإثبات والأرقام المختلقة.`,
+      effort: "medium",
+      schema: {
+        type: "object",
+        properties: {
+          angles: { type: "array", items: { type: "object", properties: { angle: { type: "string" }, ar: { type: "string" }, en: { type: "string" }, headlineAr: { type: "string" }, headlineEn: { type: "string" }, cta: { type: "string", description: "زر Meta المقترح: WHATSAPP_MESSAGE أو LEARN_MORE أو GET_QUOTE أو CALL_NOW" } }, required: ["angle", "ar", "en", "headlineAr", "headlineEn", "cta"] } },
+          audience: { type: "string", description: "الجمهور المقترح للاستهداف (المناطق، الأعمار، الاهتمامات) بجملتين" },
+          notes: { type: "string", description: "أي زاوية تبدأ بها ولماذا" },
+        },
+        required: ["angles", "audience", "notes"],
+      },
+      turns: [{ role: "user", text: `اكتب 5 إعلانات ممولة بالزوايا: مباشر للبيع، الألم، النتيجة، الفضول، قصير جداً بأسلوب UGC — من هذا المحتوى فقط:
+
+${input.caption}` }],
+    });
+    return {
+      text: `الجمهور المقترح: ${data.audience}
+${data.notes}`,
+      options: (data.angles ?? []).slice(0, 5).map((a) => ({ label: `${a.angle} · ${a.cta}`, text: humanizeClean(`${a.headlineAr}
+${a.ar}
+
+— English —
+${a.headlineEn}
+${a.en}`).text })),
     };
   }
   if (id === "post" || id === "carousel") {

@@ -15,7 +15,11 @@ import {
   Wallet,
   XCircle,
   Printer,
+  Gavel,
+  Inbox,
+  MessagesSquare,
 } from "lucide-react";
+import { DashboardHero, type InboxItem } from "@/components/dashboard-hero";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { bankBalance, custodyBalances } from "@/lib/finance";
@@ -93,6 +97,23 @@ async function ManagementDashboard({ user }: { user: AppUser }) {
       notificationsForRequest(user),
     ]);
 
+  // صندوق القرارات: ما ينتظر هذا المستخدم الآن
+  const [me, votesWaiting, auditWaiting, quotesWaiting, unreadMsgs] = await Promise.all([
+    db.user.findUnique({ where: { id: user.id }, select: { boardSeat: true } }),
+    db.boardMotion.count({ where: { status: "VOTING", votes: { none: { userId: user.id } } } }),
+    db.boardMotion.count({ where: { status: "AUDIT" } }),
+    db.quoteRequest.count({ where: { status: user.role === "ACCOUNTANT" ? "ACCOUNTANT_REVIEW" : "ADMIN_REVIEW" } }),
+    db.message.count({ where: { recipientId: user.id, readAt: null } }),
+  ]);
+  const inbox: InboxItem[] = [
+    { href: "/board?tab=vote", label: "بنود تنتظر صوتك", n: me?.boardSeat ? votesWaiting : 0, icon: Gavel, tone: "gold" },
+    { href: "/board?tab=audit", label: "بنود تنتظر تدقيقك", n: user.role === "ACCOUNTANT" ? auditWaiting : 0, icon: Gavel, tone: "gold" },
+    { href: "/quotes", label: user.role === "ACCOUNTANT" ? "عروض بانتظار تدقيقك" : "عروض أسعار بانتظار القرار", n: quotesWaiting, icon: Inbox, tone: "orange" },
+    { href: "/funds", label: "طلبات تمويل معلقة", n: isAdmin ? pendingFunds.length : 0, icon: HandCoins, tone: "blue" },
+    { href: "/messages", label: "رسائل غير مقروءة", n: unreadMsgs, icon: MessagesSquare, tone: "green" },
+    { href: "/notifications", label: "تنبيهات", n: notes.length, icon: AlertTriangle, tone: "red" },
+  ];
+
   const contractValue = activeProjects.filter((p) => ACTIVE_PROJECT_STATUSES.includes(p.status)).reduce((s, p) => s + (p.awardedValue ?? 0) + p.variationTotal, 0);
   const collected = claimsAgg.filter((c) => c.status === "PAID").reduce((s, c) => s + (c.paidAmount ?? 0), 0);
   const pendingClaims = claimsAgg.filter((c) => c.status !== "PAID").reduce((s, c) => s + claimNet(c), 0);
@@ -167,9 +188,11 @@ async function ManagementDashboard({ user }: { user: AppUser }) {
 
   return (
     <>
-      <PageHeader
-        title={`${greeting()}، ${user.name.split(" ").slice(0, 2).join(" ")}`}
-        subtitle={`${fmtDate(today)} — ${notes.length ? `لديك ${notes.length} تنبيهات تحتاج متابعة` : "لا توجد تنبيهات عاجلة"}`}
+      <DashboardHero
+        name={user.name}
+        subtitle={notes.length ? `لديك ${notes.length} تنبيهات تحتاج متابعة` : "كل شيء تحت السيطرة — لا تنبيهات عاجلة"}
+        inbox={inbox}
+        canAsk={isAdmin}
         actions={
           <>
             {isAdmin && (
@@ -177,8 +200,9 @@ async function ManagementDashboard({ user }: { user: AppUser }) {
                 <Plus className="h-4 w-4" /> عطاء جديد
               </Link>
             )}
+            <Link href="/board" className="btn border border-white/20 bg-white/10 text-white hover:bg-white/20"><Gavel className="h-4 w-4" /> مجلس الإدارة</Link>
             {!isAdmin && (
-              <ModalForm title="طلب تمويل من المدير العام" trigger={<><HandCoins className="h-4 w-4" /> طلب تمويل</>} triggerClass="btn-secondary" action={requestFunds} submitLabel="إرسال الطلب">
+              <ModalForm title="طلب تمويل من المدير العام" trigger={<><HandCoins className="h-4 w-4" /> طلب تمويل</>} triggerClass="btn border border-white/20 bg-white/10 text-white hover:bg-white/20" action={requestFunds} submitLabel="إرسال الطلب">
                 <Input name="amount" label="المبلغ المطلوب (د.أ)" type="number" required />
                 <Select name="tenderId" label="العطاء / المشروع" options={tenderOptions} placeholder="— عام —" />
                 <Textarea name="reason" label="سبب الطلب" required placeholder="مثال: دفعة مورد الحديد لمشروع مدرسة الحسا" />
@@ -187,6 +211,13 @@ async function ManagementDashboard({ user }: { user: AppUser }) {
           </>
         }
       />
+
+      <div className="stagger mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StatCard label="قيمة العقود النشطة" value={<Money value={contractValue} />} sub={`${activeProjects.filter((p) => ACTIVE_PROJECT_STATUSES.includes(p.status)).length} مشاريع قيد التنفيذ والصيانة`} icon={Briefcase} href="/tenders?view=projects" />
+        <StatCard label="المطالبات المقبوضة" value={<Money value={collected} />} sub={<>بانتظار القبض: <b className="text-ink"><Money value={pendingClaims} /></b></>} icon={Receipt} tone="green" href="/claims" />
+        <StatCard label="إجمالي المصاريف" value={<Money value={totalExpenses} />} sub="على جميع العطاءات والمشاريع" icon={Wallet} tone="orange" href="/expenses" />
+        <StatCard label="الكفالات السارية" value={<Money value={guaranteesAgg._sum.amount ?? 0} />} sub={`${guaranteesAgg._count} كفالات لدى الجهات`} icon={ShieldCheck} tone="purple" href="/guarantees" />
+      </div>
 
       {isAdmin && bank && liquidity && (
         <section className="card mb-5 overflow-hidden">
@@ -245,18 +276,7 @@ async function ManagementDashboard({ user }: { user: AppUser }) {
 
       <LiveAlerts notes={notes} />
 
-      <div className="stagger mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="قيمة العقود النشطة" value={<Money value={contractValue} />} sub={`${activeProjects.filter((p) => ACTIVE_PROJECT_STATUSES.includes(p.status)).length} مشاريع قيد التنفيذ والصيانة`} icon={Briefcase} href="/tenders?view=projects" />
-        <StatCard label="المطالبات المقبوضة" value={<Money value={collected} />} sub={<>بانتظار القبض: <b className="text-ink"><Money value={pendingClaims} /></b></>} icon={Receipt} tone="green" href="/claims" />
-        <StatCard label="إجمالي المصاريف" value={<Money value={totalExpenses} />} sub="على جميع العطاءات والمشاريع" icon={Wallet} tone="orange" href="/expenses" />
-        <StatCard label="الكفالات السارية" value={<Money value={guaranteesAgg._sum.amount ?? 0} />} sub={`${guaranteesAgg._count} كفالات لدى الجهات`} icon={ShieldCheck} tone="purple" href="/guarantees" />
-      </div>
 
-      {/* ظروف المواقع: الطقس وتنبيهات الصب والرافعات + أسعار الصرف (تُحمّل دون إبطاء اللوحة) */}
-      <div className="mb-5 grid gap-5 xl:grid-cols-3">
-        <div className="xl:col-span-2"><Suspense fallback={null}><SiteWeather /></Suspense></div>
-        <Suspense fallback={null}><FxRates /></Suspense>
-      </div>
 
       <div className="stagger mb-5 grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2" title={isAdmin ? "التدفق النقدي الشهري" : "المقبوضات مقابل المصاريف"} action={<span className="text-xs text-ink-muted">آخر 12 شهراً</span>}>
@@ -346,6 +366,12 @@ async function ManagementDashboard({ user }: { user: AppUser }) {
       </div>
 
       <h2 className="mb-3 mt-8 text-lg font-bold">مركز الإجراءات السريعة</h2>
+      {/* ظروف المواقع: الطقس وتنبيهات الصب والرافعات + أسعار الصرف (تُحمّل دون إبطاء اللوحة) */}
+      <div className="mb-5 grid gap-5 xl:grid-cols-3">
+        <div className="xl:col-span-2"><Suspense fallback={null}><SiteWeather /></Suspense></div>
+        <Suspense fallback={null}><FxRates /></Suspense>
+      </div>
+
       <div className="grid gap-5 lg:grid-cols-3">
         <Card title={<span className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-warn" /> طلبات تمويل معلقة</span>}>
           {pendingFunds.length === 0 ? (

@@ -1,4 +1,6 @@
-/** يُعاد تركيبه مع كل تنقل — يمنح كل صفحة دخولاً ناعماً */
+import { PageTransition } from "@/components/page-transition";
+
+/** يُعاد تركيبه مع كل تنقل — حركة iOS: دفع للصفحة الأعمق، رجوع للأعلى، وتلاشٍ ناعم بين الأقسام */
 export default function Template({ children }: { children: React.ReactNode }) {
-  return <div className="page-enter">{children}</div>;
+  return <PageTransition>{children}</PageTransition>;
 }

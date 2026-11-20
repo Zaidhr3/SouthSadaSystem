@@ -12,7 +12,7 @@ import { getSecret, patchSecretMeta, setSecret } from "./secret-box";
 const API = "https://api.canva.com/rest/v1";
 const SECRET = "canva";
 /** الصلاحيات المطلوبة فقط: تصدير التصميم (content) + اسمه (meta). يجب تفعيلها بنفس الأسماء في Developer Portal ← Scopes */
-export const CANVA_SCOPES = "design:content:read design:meta:read";
+export const CANVA_SCOPES = "design:content:read design:meta:read design:content:write asset:read asset:write";
 /** وضع احتياطي إن لم تُفعَّل design:meta:read: التصدير يعمل بدون اسم التصميم */
 export const CANVA_MIN_SCOPES = "design:content:read";
 
@@ -94,12 +94,40 @@ async function accessToken() {
   }
 }
 
-async function api<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API}${path}`, { method, headers: { Authorization: `Bearer ${await accessToken()}`, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(25_000), cache: "no-store" });
+async function api<T>(method: "GET" | "POST", path: string, body?: unknown, raw?: { data: Buffer; headers: Record<string, string> }): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${await accessToken()}`, ...(raw ? raw.headers : body ? { "Content-Type": "application/json" } : {}) },
+    body: raw ? new Uint8Array(raw.data) : body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(25_000),
+    cache: "no-store",
+  });
   const j = (await res.json().catch(() => ({}))) as T & { message?: string; code?: string };
   if (res.status === 429) throw new CanvaError("حد استخدام Canva مؤقت — حاول بعد دقيقة");
+  if (res.status === 403 && /scope/i.test(String(j.message ?? j.code ?? ""))) throw new CanvaError("ربط Canva الحالي لا يملك صلاحية إنشاء التصاميم — فعّل design:content:write و asset:write في Canva Developer Portal ثم أعد الربط من إعدادات النظام");
   if (!res.ok) throw new CanvaError(`Canva: ${j.message ?? j.code ?? res.status}`);
   return j;
+}
+
+/**
+ * إرسال تصميم النظام إلى Canva كتصميم قابل للتحرير بنفس المقاس (منشور 1080×1350 أو ستوري 1080×1920):
+ * رفع الصورة كأصل ← إنشاء تصميم مخصص يحتويها ← رابط التحرير. بعد التعديل في Canva يُستورد بزر «استيراد من Canva».
+ */
+export async function pushImageToCanva(img: Buffer, title: string, size: { w: number; h: number }): Promise<{ designId: string; editUrl: string }> {
+  let job = (
+    await api<{ job: { id: string; status: string; asset?: { id: string }; error?: { message?: string } } }>("POST", "/asset-uploads", undefined, {
+      data: img,
+      headers: { "Content-Type": "application/octet-stream", "Asset-Upload-Metadata": JSON.stringify({ name_base64: Buffer.from(title.slice(0, 50)).toString("base64") }) },
+    })
+  ).job;
+  for (let i = 0; job.status === "in_progress" && i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 1200));
+    job = (await api<{ job: typeof job }>("GET", `/asset-uploads/${job.id}`)).job;
+  }
+  if (job.status !== "success" || !job.asset?.id) throw new CanvaError(`تعذر رفع التصميم إلى Canva: ${job.error?.message ?? job.status}`);
+  const d = await api<{ design: { id: string; urls?: { edit_url?: string } } }>("POST", "/designs", { design_type: { type: "custom", width: size.w, height: size.h }, asset_id: job.asset.id, title: title.slice(0, 255) });
+  if (!d.design?.urls?.edit_url) throw new CanvaError("أنشأ Canva التصميم دون رابط تحرير");
+  return { designId: d.design.id, editUrl: d.design.urls.edit_url };
 }
 
 /** معرّف التصميم من رابط Canva (canva.com/design/DAxxxx/...) أو المعرّف نفسه */

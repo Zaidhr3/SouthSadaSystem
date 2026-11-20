@@ -1,7 +1,8 @@
 import Link from "next/link";
 import clsx from "clsx";
 import { CountUp } from "./count-up";
-import { FileText, Paperclip, type LucideIcon } from "lucide-react";
+import { SegmentedTabs } from "./segmented-tabs";
+import { ChevronRight, FileText, Paperclip, type LucideIcon } from "lucide-react";
 import type { Tone } from "@/lib/labels";
 import { daysUntil, fmtDate, relativeDays } from "@/lib/format";
 
@@ -10,23 +11,25 @@ export function PageHeader({
   subtitle,
   actions,
   back,
+  eyebrow,
 }: {
   title: string;
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
   back?: { href: string; label: string };
+  eyebrow?: React.ReactNode;
 }) {
   return (
     <div className="page-hero mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="relative min-w-0">
         {back && (
-          <Link href={back.href} className="mb-1 inline-block text-sm font-semibold text-accent hover:underline">
-            ‹ {back.label}
+          <Link href={back.href} className="mb-1.5 inline-flex items-center gap-0.5 text-[15px] font-bold text-accent active:opacity-60">
+            <ChevronRight className="h-5 w-5 -ms-1" aria-hidden /> {back.label}
           </Link>
         )}
-        <span aria-hidden className="title-bar mb-2 block h-1.5 w-12 rounded-full" />
-        <h1 className="text-gradient text-2xl font-extrabold sm:text-[30px]">{title}</h1>
-        {subtitle && <div className="mt-1 text-[15px] text-ink-muted">{subtitle}</div>}
+        {eyebrow && <p className="mb-1 text-[12px] font-black tracking-wide text-gold">{eyebrow}</p>}
+        <h1 className="text-[26px] font-black leading-tight tracking-tight text-navy sm:text-[30px]">{title}</h1>
+        {subtitle && <div className="mt-1.5 text-[14.5px] leading-7 text-ink-muted">{subtitle}</div>}
       </div>
       {actions && <div className="relative flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -112,21 +115,21 @@ export function StatCard({
   href?: string;
 }) {
   const body = (
-    <div className={clsx("card card-pad group relative h-full overflow-hidden transition hover-lift", href && "cursor-pointer")}>
+    <div className={clsx("card group relative h-full overflow-hidden p-4 transition hover-lift sm:p-6", href && "cursor-pointer pressable")}>
       <span aria-hidden className={clsx("pointer-events-none absolute -end-10 -top-10 h-28 w-28 rounded-full opacity-[0.13] blur-2xl", statGlow[tone])} />
       <div className="relative flex items-start justify-between gap-3">
-        <p className="text-[13px] font-bold text-ink-muted">{label}</p>
+        <p className="text-[12px] font-bold leading-5 text-ink-muted sm:text-[13px]">{label}</p>
         {Icon && (
-          <span className={clsx("grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-white shadow-card transition duration-500 group-hover:-rotate-6 group-hover:scale-110", statIcon[tone])}>
-            <Icon className="h-5 w-5" aria-hidden />
+          <span className={clsx("grid h-8 w-8 shrink-0 sm:h-10 sm:w-10 place-items-center rounded-2xl text-white shadow-card transition duration-500 group-hover:-rotate-6 group-hover:scale-110", statIcon[tone])}>
+            <Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
           </span>
         )}
       </div>
-      <p className="num relative mt-2 text-end text-2xl font-extrabold text-ink sm:text-[26px]" style={{ direction: "rtl" }}>
+      <p className="num relative mt-2 text-end text-[19px] font-extrabold leading-tight text-ink sm:text-[26px]" style={{ direction: "rtl" }}>
         {typeof value === "string" || typeof value === "number" ? <CountUp text={String(value)} /> : value}
       </p>
       <span aria-hidden className={clsx("absolute inset-x-0 bottom-0 h-1 origin-right scale-x-0 transition-transform duration-500 group-hover:scale-x-100", statIcon[tone])} />
-      {sub && <div className="mt-1 text-[13px] text-ink-muted">{sub}</div>}
+      {sub && <div className="mt-1 line-clamp-2 text-[11.5px] leading-5 text-ink-muted sm:text-[13px]">{sub}</div>}
     </div>
   );
   return href ? (
@@ -260,34 +263,5 @@ export function TabPanel({ tab, children }: { tab: string; children: React.React
 }
 
 export function Tabs({ tabs, active, base }: { tabs: TabItem[]; active: string; base: string }) {
-  const primary = tabs.filter((t) => !t.more || t.key === active);
-  const more = tabs.filter((t) => t.more && t.key !== active);
-  const pill = (t: TabItem, inMenu = false) => (
-    <Link
-      key={t.key}
-      href={`${base}?tab=${t.key}`}
-      scroll={false}
-      className={clsx(
-        "flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition",
-        inMenu ? "w-full justify-between hover:bg-accent-soft hover:text-accent" : active === t.key ? "bg-gradient-to-l from-accent to-[#f59f0b] text-white shadow-glow" : "text-ink-muted hover:bg-white hover:text-ink",
-      )}
-    >
-      {t.label}
-      {typeof t.count === "number" && t.count > 0 && <span className={clsx("num rounded-full px-1.5 text-[11px]", active === t.key && !inMenu ? "bg-white/25" : "bg-black/[0.06]")}>{t.count}</span>}
-    </Link>
-  );
-  return (
-    <nav className="no-print relative z-20 mb-5 flex items-center gap-1 rounded-2xl bg-white/70 p-1 shadow-card ring-1 ring-black/[0.04] backdrop-blur" aria-label="أقسام">
-      <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{primary.map((t) => pill(t))}</div>
-      {more.length > 0 && (
-        <details className="group relative shrink-0">
-          <summary className="flex cursor-pointer list-none items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-ink-muted hover:text-ink [&::-webkit-details-marker]:hidden">
-            المزيد
-            <span className="num rounded-full bg-black/[0.06] px-1.5 text-[11px]">{more.length}</span>
-          </summary>
-          <div className="absolute end-0 top-full z-30 mt-2 w-56 origin-top animate-pop-in rounded-2xl border border-line bg-white p-1.5 shadow-pop">{more.map((t) => pill(t, true))}</div>
-        </details>
-      )}
-    </nav>
-  );
+  return <SegmentedTabs tabs={tabs} active={active} base={base} />;
 }

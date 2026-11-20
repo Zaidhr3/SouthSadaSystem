@@ -29,6 +29,15 @@ model User {
   notice        String?
   noticeSetAt   DateTime?
   noticeAckAt   DateTime?
+  /// مقعد مجلس الإدارة: CHAIR رئيس المجلس | MEMBER عضو | null ليس عضواً
+  boardSeat     String?
+  /// الملف الشخصي: الصورة الشخصية، الغلاف، خلفية النظام (مرفقات أو قوالب جاهزة)، والسيرة
+  avatarId        Int?
+  coverId         Int?
+  wallpaperId     Int?
+  coverPreset     String?
+  wallpaperPreset String?
+  bio             String?
   createdAt     DateTime  @default(now())
 
   events           NotificationEvent[]
@@ -171,8 +180,13 @@ model BoqItem {
   editedById  Int?
   editedAt    DateTime?
   editNote    String?
+  /// بصمة المواصفات المهمة (يستخرجها الذكاء الاصطناعي): المادة|الدرجة|الأبعاد|الطريقة|الوحدة — للمقارنة بين العطاءات
+  specKey     String?
+  /// المواصفات المهمة كقائمة مختصرة (JSON: [{k, v}]) — بدون الحشو العام
+  keySpecs    String?
   createdAt   DateTime  @default(now())
 
+  @@index([specKey])
   @@index([normalized])
   @@index([category])
   @@index([tenderId])
@@ -1166,6 +1180,10 @@ model MarketingItem {
   mediaIds          String?
   /// تصميم Canva المرتبط (يُصدَّر منه تلقائياً)
   canvaDesignId     String?
+  /// شكل التصميم: POST منشور 4:5 | STORY ستوري 9:16 | SQUARE مربع
+  format            String?
+  /// رابط تحرير التصميم في Canva (بعد إرساله إليه)
+  canvaEditUrl      String?
   /// إعادة الإطلاق: المنشور القديم الذي يحل هذا العنصر محله (JSON: {fb?, ig?, fbLink?, igLink?, at, retired?})
   relaunchOf        String?
   createdById       Int?
@@ -1308,6 +1326,8 @@ model AdBoost {
   adSetId     String?
   adId        String?
   log         String?
+  /// من استقطب الإعلان: {age:[{k,reach,clicks}], gender:[...], region:[...], spend, reach, clicks, at}
+  audience    Json?
   createdById Int
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -1330,4 +1350,168 @@ model AssistantAction {
   createdAt   DateTime  @default(now())
 
   @@index([threadId, status])
+}
+
+/// بند/قرار مجلس الإدارة: يُدقَّق من المحاسب ثم يُرفع للمجلس للتصويت، أو يعتمده الرئيس فوراً بسبب مكتوب يُرسل للأعضاء
+model BoardMotion {
+  id            Int         @id @default(autoincrement())
+  ref           String      @unique
+  /// QUOTE | FUND | VARIATION | PURCHASE | GENERAL
+  kind          String
+  refId         Int?
+  title         String
+  details       String
+  amount        Float?
+  /// AUDIT بانتظار تدقيق المحاسب | VOTING أمام المجلس | APPROVED | REJECTED | RETURNED | WITHDRAWN
+  status        String      @default("AUDIT")
+  submittedById Int
+  auditorId     Int?
+  auditNote     String?
+  auditedAt     DateTime?
+  /// VOTE بالتصويت | CHAIR_FAST اعتماد فوري من الرئيس
+  decidedBy     String?
+  decidedById   Int?
+  fastReason    String?
+  decidedAt     DateTime?
+  /// نتيجة غرفة النقد (Roast Room) إن عُرض البند عليها
+  roast         Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  votes         BoardVote[]
+
+  @@index([status])
+  @@index([kind, refId])
+}
+
+model BoardVote {
+  id        Int         @id @default(autoincrement())
+  motionId  Int
+  motion    BoardMotion @relation(fields: [motionId], references: [id], onDelete: Cascade)
+  userId    Int
+  userName  String
+  /// YES | NO | ABSTAIN
+  vote      String
+  note      String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([motionId, userId])
+}
+
+/// قسم الرواتب: كل من يتقاضى أجراً — عمال اليومية، الموظفون الشهريون، المهندسون والمدراء والمحاسبون والسائقون والحراس
+model Employee {
+  id             Int       @id @default(autoincrement())
+  name           String
+  nationalId     String?
+  phone          String?
+  /// DAILY عامل مياومة (أجر يومي حسب الحضور) | MONTHLY راتب شهري ثابت
+  payType        String    @default("MONTHLY")
+  /// WORKER | SKILLED | FOREMAN | ENGINEER | PM | ACCOUNTANT | ADMIN | DRIVER | OPERATOR | GUARD | OTHER
+  category       String    @default("WORKER")
+  jobTitle       String?
+  dailyRate      Float?
+  monthlySalary  Float?
+  /// بدلات شهرية ثابتة (مواصلات، سكن، هاتف...)
+  allowances     Float     @default(0)
+  /// مشمول بالضمان الاجتماعي: يُقتطع 7.5% من الموظف وتدفع الشركة 14.25%
+  socialSecurity Boolean   @default(false)
+  /// CASH | BANK | CLIQ
+  payMethod      String    @default("CASH")
+  iban           String?
+  /// المشروع الافتراضي (لتوزيع كلفة العمالة)
+  tenderId       Int?
+  /// حساب النظام المرتبط (للمدراء والمحاسبين)
+  userId         Int?
+  startDate      DateTime?
+  endDate        DateTime?
+  active         Boolean   @default(true)
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  workDays       WorkDay[]
+  adjustments    PayAdjustment[]
+  lines          PayrollLine[]
+
+  @@index([active, payType])
+}
+
+/// يومية الحضور لعمال المياومة (يوم كامل 1، نصف يوم 0.5) + ساعات إضافية
+model WorkDay {
+  id            Int      @id @default(autoincrement())
+  employeeId    Int
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date          DateTime
+  days          Float    @default(1)
+  overtimeHours Float    @default(0)
+  tenderId      Int?
+  note          String?
+  recordedById  Int
+  createdAt     DateTime @default(now())
+
+  @@unique([employeeId, date])
+  @@index([date])
+  @@index([tenderId])
+}
+
+/// سلف، خصومات، مكافآت — تُحتسب في مسير الشهر المحدد
+model PayAdjustment {
+  id          Int      @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// YYYY-MM
+  period      String
+  /// ADVANCE سلفة | DEDUCTION خصم | BONUS مكافأة
+  type        String
+  amount      Float
+  note        String?
+  createdById Int
+  createdAt   DateTime @default(now())
+
+  @@index([period])
+  @@index([employeeId])
+}
+
+/// مسير رواتب شهري: يعدّه المحاسب ← يُرفع لمجلس الإدارة ← يُصرف
+model PayrollRun {
+  id           Int           @id @default(autoincrement())
+  /// YYYY-MM
+  period       String        @unique
+  /// DRAFT مسودة | SUBMITTED أمام المجلس | APPROVED معتمد | PAID مصروف
+  status       String        @default("DRAFT")
+  gross        Float         @default(0)
+  net          Float         @default(0)
+  employerSS   Float         @default(0)
+  note         String?
+  createdById  Int
+  approvedAt   DateTime?
+  paidAt       DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  lines        PayrollLine[]
+}
+
+model PayrollLine {
+  id           Int        @id @default(autoincrement())
+  runId        Int
+  run          PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId   Int
+  employee     Employee   @relation(fields: [employeeId], references: [id])
+  payType      String
+  days         Float      @default(0)
+  rate         Float      @default(0)
+  base         Float      @default(0)
+  allowances   Float      @default(0)
+  overtime     Float      @default(0)
+  bonus        Float      @default(0)
+  advances     Float      @default(0)
+  deductions   Float      @default(0)
+  ssEmployee   Float      @default(0)
+  ssEmployer   Float      @default(0)
+  net          Float      @default(0)
+  payMethod    String     @default("CASH")
+  tenderId     Int?
+  paid         Boolean    @default(false)
+  paidAt       DateTime?
+
+  @@unique([runId, employeeId])
 }

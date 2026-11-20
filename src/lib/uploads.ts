@@ -15,6 +15,8 @@ const ALLOWED_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", 
 export { attachmentHeaders, mimeFor } from "./file-types";
 
 export type EntityType =
+  /** الملف الشخصي للمستخدم: الصورة الشخصية والغلاف والخلفية (يراها كل الزملاء) */
+  | "user_profile"
   | "tender"
   | "expense"
   | "claim"

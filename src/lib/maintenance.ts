@@ -17,7 +17,7 @@ p{margin:0 0 6px;line-height:1.9;color:rgba(255,255,255,.82)}
 @keyframes in{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
 </style></head><body>
 <div class="box">
-<div class="logo"><img src="/logo.JPG" alt="صدى الجنوب"></div>
+<div class="logo"><img src="/logo-mark.svg" alt="صدى الجنوب"></div>
 <h1>النظام تحت الصيانة والتحديث</h1>
 <p>نعمل الآن على تحديث نظام <span class="gold">شركة صدى الجنوب للمقاولات الإنشائية</span> وإضافة تحسينات جديدة.</p>
 <p>بياناتكم محفوظة بالكامل — يرجى المحاولة بعد قليل.</p>

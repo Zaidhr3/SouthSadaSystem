@@ -13,7 +13,8 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   const att = await db.attachment.findUnique({ where: { id: Number(params.id) } });
   if (!att) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  if (!can.viewAll(user.role)) {
+  // صور الملفات الشخصية (الصورة/الغلاف/الخلفية) يراها كل مستخدمي النظام
+  if (!can.viewAll(user.role) && att.entityType !== "user_profile") {
     let allowed = att.uploadedById === user.id;
     if (!allowed) {
       const tenderId = await attachmentTenderId(att.entityType, att.entityId);

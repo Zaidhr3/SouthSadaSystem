@@ -9,7 +9,9 @@ import { saveAttachments, validateAttachments } from "@/lib/uploads";
 import { composeItem, smartCompose } from "@/lib/design/compose";
 import { TEMPLATES, coverHtml, profileHtml, type TemplateId } from "@/lib/design/templates";
 import { renderImages } from "@/lib/design/render";
-import { CanvaError, designIdFrom, exportDesign, saveCanvaApp } from "@/lib/canva";
+import { CanvaError, designIdFrom, exportDesign, pushImageToCanva, saveCanvaApp } from "@/lib/canva";
+import { readAttachmentData } from "@/lib/uploads";
+import { SIZES } from "@/lib/design/templates";
 import { deleteSecret } from "@/lib/secret-box";
 import { applyPageImage, MetaError } from "@/lib/meta";
 
@@ -216,5 +218,28 @@ export async function designPending(_: ActionState, __: FormData): Promise<Actio
   });
   revalidatePath("/marketing/grid");
   revalidatePath("/marketing");
+  return r;
+}
+
+/** «عدّل في Canva»: يرسل التصميم الحالي إلى Canva كتصميم قابل للتحرير بنفس المقاس، ويعيد رابط التحرير */
+export async function pushToCanva(itemId: number, _: ActionState, __: FormData): Promise<ActionState> {
+  const r = await run(async () => {
+    await actionUser(can.manageMarketing);
+    const it = await db.marketingItem.findUnique({ where: { id: itemId }, select: { id: true, title: true, kind: true, imageAttachmentId: true } });
+    if (!it) throw new AppError("العنصر غير موجود");
+    const att = it.imageAttachmentId ? await db.attachment.findUnique({ where: { id: it.imageAttachmentId } }) : await db.attachment.findFirst({ where: { entityType: "marketing", entityId: itemId, slot: "slide:1" }, orderBy: { id: "desc" } });
+    if (!att) throw new AppError("صمّم العنصر أولاً ثم أرسله إلى Canva");
+    const buf = await readAttachmentData(att);
+    if (!buf) throw new AppError("تعذر قراءة صورة التصميم");
+    try {
+      const size = it.kind === "STORY" ? SIZES.story : SIZES.post;
+      const d = await pushImageToCanva(buf, `صدى الجنوب — ${it.title}`, size);
+      await db.marketingItem.update({ where: { id: itemId }, data: { canvaDesignId: d.designId, canvaEditUrl: d.editUrl } });
+      return "أُرسل التصميم إلى Canva — اضغط «افتح في Canva» للتعديل، ثم «استورد تعديلاتي»";
+    } catch (e) {
+      throw new AppError(e instanceof CanvaError ? e.message : `تعذر الإرسال إلى Canva: ${e instanceof Error ? e.message : e}`);
+    }
+  });
+  revalidatePath(`/marketing/${itemId}`);
   return r;
 }

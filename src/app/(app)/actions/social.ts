@@ -103,3 +103,17 @@ export async function pickAdAccountAction(_: ActionState, fd: FormData): Promise
   done();
   return r;
 }
+
+/** تحديث «من استقطبت إعلاناتك» من Meta Insights */
+export async function refreshAudienceAction(_: ActionState, __: FormData): Promise<ActionState> {
+  const r = await run(async () => {
+    await actionUser(can.manageMarketing);
+    const { refreshAudiences } = await import("@/lib/boost");
+    const res = await refreshAudiences();
+    if (!res.total) throw new AppError("لا توجد إعلانات ممولة منشورة بعد — موّل منشوراً أولاً");
+    if (!res.ok) throw new AppError(`تعذر جلب الجمهور: ${res.error}`);
+    return `حُدّث جمهور ${res.ok} من ${res.total} إعلانات`;
+  });
+  revalidatePath("/marketing/accounts");
+  return r;
+}

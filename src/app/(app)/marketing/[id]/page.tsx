@@ -16,7 +16,7 @@ import { CHECK_LABEL, detect, structuralFlags, VERDICT, type CheckName } from "@
 import { SKILLS } from "@/lib/content-skills/skills";
 import { SkillRunner } from "../skill-runner";
 import { CalendarClock, Fingerprint, MessagesSquare, Mic, Palette, Sparkles } from "lucide-react";
-import { composeAction, importCanva, smartComposeAction } from "../../actions/design";
+import { composeAction, importCanva, pushToCanva, smartComposeAction } from "../../actions/design";
 import { TEMPLATES, type TemplateId } from "@/lib/design/templates";
 import { canvaStatus, listDesigns } from "@/lib/canva";
 import { servicesStatus, voices as elVoices } from "@/lib/ai-services";
@@ -235,6 +235,7 @@ export default async function MarketingItemPage({ params }: { params: { id: stri
                   <Select name="template" label="القالب" options={[{ value: "auto", label: "تلقائي (تناسق شبكة إنستغرام)" }, ...Object.entries(TEMPLATES).map(([value, t]) => ({ value, label: `${t.name} — ${t.photo === "required" ? "بصورة" : t.photo === "none" ? "بلا صورة" : "صورة اختيارية"}` }))]} defaultValue="auto" />
                   <Input name="headline" label="العنوان على التصميم" defaultValue={it.storyText || it.title} hint="من نص المنشور نفسه — لا أرقام جديدة" />
                 </Grid>
+                <Input name="sub" label="السطر الثاني على التصميم (اختياري)" defaultValue="" hint="اتركه فارغاً لتصميم أنظف" />
                 {assets.length === 0 ? (
                   <p className="rounded-xl bg-canvas p-3 text-sm text-ink-muted">مكتبة الوسائط فارغة — <a href="/marketing/media" className="font-bold text-accent">ارفع صور المعدات والمشاريع</a> لدمجها في التصميم.</p>
                 ) : (
@@ -256,6 +257,20 @@ export default async function MarketingItemPage({ params }: { params: { id: stri
               </ActionForm>
               {canva.connected ? (
                 <div className="mt-4 border-t border-line pt-4">
+                  {slides.length > 0 && (
+                    <div className="mb-4 rounded-2xl border border-[#7d2ae8]/25 bg-gradient-to-l from-[#7d2ae8]/[0.07] to-[#00c4cc]/[0.07] p-3">
+                      <p className="mb-2 text-sm font-bold text-[#5b1fc0]">عدّل التصميم في Canva بنفس المقاس ({it.kind === "STORY" ? "ستوري 1080×1920" : "منشور 1080×1350"}) ثم أرجعه للنظام</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ActionForm action={pushToCanva.bind(null, id)} submitLabel={it.canvaEditUrl ? "أرسل النسخة الحالية من جديد" : "أرسل إلى Canva"} draft={false}><span /></ActionForm>
+                        {it.canvaEditUrl && <a href={it.canvaEditUrl} target="_blank" rel="noopener" className="btn bg-[#7d2ae8] text-white">افتح في Canva ↗</a>}
+                        {it.canvaDesignId && (
+                          <ActionForm action={importCanva.bind(null, id)} submitLabel="استورد تعديلاتي من Canva" draft={false}>
+                            <input type="hidden" name="link" value={it.canvaDesignId} />
+                          </ActionForm>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {canvaDesigns.length > 0 && (
                     <div className="mb-3">
                       <p className="label">آخر تصاميمك في Canva — استيراد بضغطة</p>

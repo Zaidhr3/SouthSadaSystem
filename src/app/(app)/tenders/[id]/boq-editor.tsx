@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { History, Loader2, Pencil, Sparkles, Trash2, TrendingDown, TrendingUp, Upload } from "lucide-react";
+import { History, Loader2, MapPin, Pencil, ScanSearch, Sparkles, Trash2, TrendingDown, TrendingUp, Upload } from "lucide-react";
 import clsx from "clsx";
 import { ActionForm, ConfirmButton, Grid, Input, ModalForm, Select, Textarea } from "@/components/forms";
 import { BOQ_CATEGORY, BOQ_UNITS } from "@/lib/labels";
 import type { PriceGroup } from "@/lib/pricing";
-import { addBoqItem, deleteBoqItem, importBoqItems, lookupPriceHistory, updateBoqItem } from "../../actions/boq";
+import type { SpecMatch } from "@/lib/boq-specs";
+import { addBoqItem, deleteBoqItem, importBoqItems, indexTenderSpecs, lookupPriceHistory, lookupSpecMatches, updateBoqItem } from "../../actions/boq";
+import { useToast } from "@/components/toast";
+import { useRouter } from "next/navigation";
 
 export type BoqRow = {
   id: number;
@@ -26,6 +29,10 @@ export type BoqRow = {
   /** تعديل مدير المشروع على بند مستخرج (يظهر للمحاسب والإدارة) */
   editNote?: string | null;
   editedAt?: string | null;
+  /** المواصفات المهمة كما قرأها الذكاء الاصطناعي */
+  keySpecs?: { k: string; v: string }[];
+  /** نفس المواصفات في عطاءات سابقة */
+  matches?: SpecMatch[];
 };
 
 const nf = new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 });
@@ -178,6 +185,60 @@ function PricingAssistant({ query, tenderId, onApply }: { query: string; tenderI
   );
 }
 
+
+/** شرائح «نفس المواصفات سُعّرت في…»: المنطقة، السنة، السعر — مع فرق سعرك عنها */
+function SpecMatchLine({ matches, price, onPick }: { matches: SpecMatch[]; price?: number; onPick?: (p: number) => void }) {
+  if (!matches.length) return null;
+  const exact = matches.filter((m) => m.exact);
+  const list = (exact.length ? exact : matches).slice(0, 4);
+  const avg = list.reduce((a, m) => a + m.unitPrice, 0) / list.length;
+  const diff = price && avg ? ((price - avg) / avg) * 100 : null;
+  return (
+    <div className="mt-1.5 rounded-xl border border-gold/40 bg-gold-soft/70 px-2.5 py-1.5 text-[12px] leading-6">
+      <span className="font-black text-navy">{exact.length ? "نفس المواصفات سُعّرت:" : "مواصفات قريبة سُعّرت:"} </span>
+      {list.map((m, i) => (
+        <button key={m.boqItemId} type="button" disabled={!onPick} onClick={() => onPick?.(m.unitPrice)} title={`${m.tenderName} — ${nf.format(m.quantity)} ${m.unit}`}
+          className={clsx("inline-flex items-center gap-1 font-semibold text-ink", onPick && "hover:text-accent")}>
+          {i > 0 && <span className="mx-1 text-ink-faint">·</span>}
+          <MapPin className="h-3 w-3 text-accent" />{m.place} {m.year} <b className="num text-navy">{nf.format(m.unitPrice)}</b>
+        </button>
+      ))}
+      {diff != null && Math.abs(diff) >= 1 && (
+        <span className={clsx("ms-2 rounded-full px-2 py-0.5 text-[11px] font-black", diff > 0 ? "bg-warn-soft text-warn" : "bg-good-soft text-good")}>
+          سعرك {diff > 0 ? "أعلى" : "أقل"} بـ <span className="num">{Math.abs(diff).toFixed(0)}%</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** أثناء الكتابة: الذكاء الاصطناعي يقرأ المواصفات المهمة للبند ويبحث عن نفسها في كل العطاءات السابقة */
+function SpecAssistant({ desc, unit, tenderId, price, onPick }: { desc: string; unit: string; tenderId: number; price: number; onPick: (p: number) => void }) {
+  const [res, setRes] = useState<{ specs: { k: string; v: string }[]; matches: SpecMatch[]; error?: string } | null>(null);
+  const [pending, start] = useTransition();
+  const seq = useRef(0);
+  useEffect(() => {
+    const q = desc.trim();
+    if (q.length < 15) { setRes(null); return; }
+    const n = ++seq.current;
+    const t = setTimeout(() => start(async () => { const r = await lookupSpecMatches(q, unit, tenderId); if (n === seq.current) setRes(r); }), 1400);
+    return () => clearTimeout(t);
+  }, [desc, unit, tenderId]);
+  if (desc.trim().length < 15) return null;
+  return (
+    <div className="mb-4 rounded-2xl border border-navy/10 bg-gradient-to-b from-navy/[0.04] to-transparent p-3.5">
+      <p className="flex items-center gap-2 text-sm font-black text-navy"><ScanSearch className="h-4 w-4 text-accent" /> المواصفات المهمة {pending && <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />}</p>
+      {res?.error && <p className="mt-1 text-xs text-bad">{res.error}</p>}
+      {res && res.specs.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {res.specs.map((s, i) => <span key={i} className="rounded-full bg-white px-2.5 py-0.5 text-[12px] font-semibold text-ink shadow-card ring-1 ring-line"><span className="text-ink-muted">{s.k}:</span> {s.v}</span>)}
+        </div>
+      )}
+      {res && (res.matches.length ? <SpecMatchLine matches={res.matches} price={price} onPick={onPick} /> : !pending && res.specs.length > 0 && <p className="mt-2 text-xs text-ink-muted">لم تُسعَّر هذه المواصفات بالضبط في أي عطاء سابق.</p>)}
+    </div>
+  );
+}
+
 function AddItemPanel({ tenderId }: { tenderId: number }) {
   const [k, setK] = useState(0);
   const [desc, setDesc] = useState("");
@@ -234,13 +295,25 @@ function AddItemPanel({ tenderId }: { tenderId: number }) {
         <UnitList />
       </ActionForm>
       <div className="lg:border-s lg:border-line lg:ps-5">
+        <SpecAssistant desc={desc} unit={unit} tenderId={tenderId} price={Number(price) || 0} onPick={(p) => setPrice(String(p))} />
         <PricingAssistant query={desc} tenderId={tenderId} onApply={apply} />
       </div>
     </div>
   );
 }
 
-export function BoqEditor({ tenderId, items, canEdit, showEdits }: { tenderId: number; items: BoqRow[]; canEdit: boolean; showEdits?: boolean }) {
+function IndexSpecsButton({ tenderId, count }: { tenderId: number; count: number }) {
+  const [pending, start] = useTransition();
+  const toast = useToast();
+  const router = useRouter();
+  return (
+    <button type="button" disabled={pending} className="btn-secondary btn-sm" onClick={() => start(async () => { const r = await indexTenderSpecs(tenderId); toast(r.ok ? "success" : "error", r.ok ? r.message ?? "تم" : r.error ?? "تعذر"); router.refresh(); })}>
+      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />} {pending ? "يقرأ المواصفات…" : `اقرأ المواصفات المهمة وقارن (${count})`}
+    </button>
+  );
+}
+
+export function BoqEditor({ tenderId, items, canEdit, showEdits, unindexed = 0 }: { tenderId: number; items: BoqRow[]; canEdit: boolean; showEdits?: boolean; unindexed?: number }) {
   const total = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
   const cost = items.reduce((s, i) => s + i.quantity * (i.costPrice ?? 0), 0);
   const hasCost = items.some((i) => i.costPrice);
@@ -265,7 +338,7 @@ export function BoqEditor({ tenderId, items, canEdit, showEdits }: { tenderId: n
 
       <section className="card">
         <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5 sm:px-6">
-          <h2 className="text-[17px] font-bold">جدول الكميات المسعّر ({items.length} بند)</h2>
+          <h2 className="flex flex-wrap items-center gap-2 text-[17px] font-bold">جدول الكميات المسعّر ({items.length} بند) {unindexed > 0 && <IndexSpecsButton tenderId={tenderId} count={unindexed} />}</h2>
           <p className="text-sm">
             الإجمالي: <b className="num text-lg">{money(total)}</b>
             {hasCost && <span className="ms-3 text-ink-muted">هامش تقديري: <b className="num">{total > 0 ? (((total - cost) / total) * 100).toFixed(1) : 0}%</b></span>}
@@ -295,6 +368,12 @@ export function BoqEditor({ tenderId, items, canEdit, showEdits }: { tenderId: n
                     <td className="max-w-[360px]">
                       <span className="block font-semibold">{i.description}</span>
                       {(i.supplier || i.specs) && <span className="text-xs text-ink-muted">{[i.supplier, i.specs].filter(Boolean).join(" — ")}</span>}
+                      {!!i.keySpecs?.length && (
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {i.keySpecs.map((k, n) => <span key={n} className="rounded-md bg-navy/[0.06] px-1.5 py-0.5 text-[11px] font-semibold text-navy-3">{k.k}: {k.v}</span>)}
+                        </span>
+                      )}
+                      {!!i.matches?.length && <SpecMatchLine matches={i.matches} price={i.unitPrice} />}
                       {i.source === "AI" && (
                         <span className="mt-1 me-1 inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-[#0058b0]">
                           <Sparkles className="h-3 w-3" aria-hidden /> مستخرج آلياً{i.sourcePage ? ` — ص ${i.sourcePage}` : ""}{i.sourceRef ? ` — ${i.sourceRef}` : ""}
