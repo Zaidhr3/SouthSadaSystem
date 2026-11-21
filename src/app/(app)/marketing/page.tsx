@@ -18,6 +18,7 @@ import { generateBrainstorm, generateEvent, generateFromIdea, generateWeek, runS
 import { SKILLS } from "@/lib/content-skills/skills";
 import { SkillRunner } from "./skill-runner";
 import { StudioClient } from "./studio/studio-client";
+import { BulkSelect, SelectCell, SelectHead } from "./bulk-select";
 
 export const metadata = { title: "التسويق والعلاقات العامة" };
 export const maxDuration = 300;
@@ -176,6 +177,12 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
           </Link>
         ))}
       </nav>
+      {manage && items.length > 0 ? <BulkSelect ids={items.map((i) => i.id)}>{list()}</BulkSelect> : list()}
+    </>
+  );
+
+  function list() {
+    return (
       <Card pad={false}>
         {items.length === 0 ? (
           <EmptyState icon={Megaphone} title="لا يوجد محتوى هنا" hint={manage ? "اضغط «اقترح خطة الأسبوع» أو اكتب فكرتك" : undefined} />
@@ -184,6 +191,7 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
             <table className="tbl">
               <thead>
                 <tr>
+                  <SelectHead />
                   <th>الموعد</th>
                   <th>النوع</th>
                   <th>الفكرة</th>
@@ -194,6 +202,7 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
               <tbody>
                 {items.map((it) => (
                   <tr key={it.id}>
+                    <SelectCell id={it.id} />
                     <td className="num whitespace-nowrap">{it.scheduledFor ? fmtDate(it.scheduledFor) : "—"}</td>
                     <td><StatusBadge map={MKT_KIND} value={it.kind} /></td>
                     <td className="max-w-[420px]">
@@ -209,6 +218,6 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
           </div>
         )}
       </Card>
-    </>
-  );
+    );
+  }
 }

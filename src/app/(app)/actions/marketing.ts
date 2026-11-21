@@ -196,6 +196,18 @@ export async function deleteItem(id: number) {
   return r;
 }
 
+/** حذف جماعي: منشور واحد أو عدة منشورات أو كل المعروض */
+export async function deleteItems(ids: number[]) {
+  const r = await runVoid(async () => {
+    await actionUser(can.manageMarketing);
+    const clean = Array.from(new Set((Array.isArray(ids) ? ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))).slice(0, 500);
+    if (!clean.length) throw new AppError("لم تحدد أي منشور");
+    await db.marketingItem.deleteMany({ where: { id: { in: clean } } });
+  });
+  done();
+  return r;
+}
+
 export type SkillState = { factWarning?: string; error?: string; text?: string; caption?: string; options?: { label: string; text: string }[]; at?: number };
 
 /** تشغيل مهارة محتوى (المؤنسن، الخطافات، الكاروسيل، الردود...) على عنصر أو على نص حر */
