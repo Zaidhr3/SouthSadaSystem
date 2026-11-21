@@ -493,7 +493,7 @@ export function FileInput({
           name={name}
           multiple
           disabled={uploadingNow}
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx,.dwg,.zip,image/*"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx,.dwg,.zip,.mp4,.mov,image/*,video/mp4,video/quicktime"
           className="sr-only"
           onChange={(e) => void onPick(e.currentTarget)}
         />

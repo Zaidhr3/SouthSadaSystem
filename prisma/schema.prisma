@@ -13,24 +13,24 @@ datasource db {
 
 /// role: ADMIN | ACCOUNTANT | PM | CHAIRMAN (المشرف الأعلى — اطلاع فقط) | AUDITOR (مراقب ومدقق — اطلاع فقط)
 model User {
-  id            Int       @id @default(autoincrement())
-  username      String    @unique
-  name          String
-  title         String?
-  phone         String?
-  role          String
-  passwordHash  String
-  email         String?
-  notifyEmail   Boolean   @default(true)
-  active        Boolean   @default(true)
+  id              Int       @id @default(autoincrement())
+  username        String    @unique
+  name            String
+  title           String?
+  phone           String?
+  role            String
+  passwordHash    String
+  email           String?
+  notifyEmail     Boolean   @default(true)
+  active          Boolean   @default(true)
   /// سبب الإيقاف — يظهر للمستخدم عند محاولة الدخول
-  suspendReason String?
+  suspendReason   String?
   /// تعميم إلزامي من المدير العام يظهر عند الدخول حتى يؤكد المستخدم اطلاعه
-  notice        String?
-  noticeSetAt   DateTime?
-  noticeAckAt   DateTime?
+  notice          String?
+  noticeSetAt     DateTime?
+  noticeAckAt     DateTime?
   /// مقعد مجلس الإدارة: CHAIR رئيس المجلس | MEMBER عضو | null ليس عضواً
-  boardSeat     String?
+  boardSeat       String?
   /// الملف الشخصي: الصورة الشخصية، الغلاف، خلفية النظام (مرفقات أو قوالب جاهزة)، والسيرة
   avatarId        Int?
   coverId         Int?
@@ -38,7 +38,7 @@ model User {
   coverPreset     String?
   wallpaperPreset String?
   bio             String?
-  createdAt     DateTime  @default(now())
+  createdAt       DateTime  @default(now())
 
   events           NotificationEvent[]
   messagesSent     Message[]           @relation("MessageSender")
@@ -145,6 +145,7 @@ model Tender {
   diaries          SiteDiary[]
   fieldRequests    FieldRequest[]
   clientAccesses   ClientAccess[]
+  coBuildProjects  CoBuildProject[]
   workPlan         WorkPlanItem[]
   portalMessages   PortalMessage[]
   signRequests     SignRequest[]
@@ -1014,6 +1015,8 @@ model Client {
   createdById        Int
   createdAt          DateTime       @default(now())
   accesses           ClientAccess[]
+  coBuildBuyers      CoBuildBuyer[]
+  noticeSeenAt       DateTime?
 }
 
 model ClientAccess {
@@ -1285,35 +1288,35 @@ model AiSkill {
 /// مركز الحسابات: لقطة منشورات فيسبوك وإنستغرام مع الأداء وحكم المحلل الذكي (إبقاء/إخفاء/حذف/تمويل)
 model SocialPost {
   /// معرّف المنشور على Meta
-  id          String    @id
+  id         String    @id
   /// FB | IG
-  platform    String
+  platform   String
   /// IMAGE | VIDEO | REEL | CAROUSEL | TEXT
-  mediaType   String?
-  text        String?
-  picture     String?
-  permalink   String?
-  postedAt    DateTime
+  mediaType  String?
+  text       String?
+  picture    String?
+  permalink  String?
+  postedAt   DateTime
   /// {reach, views, likes, comments, shares, saves, engagement}
-  metrics     Json?
+  metrics    Json?
   /// KEEP | IMPROVE | HIDE | DELETE | BOOST
-  verdict     String?
-  reason      String?
+  verdict    String?
+  reason     String?
   /// 0–100: جدارة التمويل الإعلاني
-  boostScore  Int?
+  boostScore Int?
   /// قرار الإدارة بعد الحكم: DONE | IGNORED
-  decision    String?
-  analyzedAt  DateTime?
-  fetchedAt   DateTime  @default(now())
+  decision   String?
+  analyzedAt DateTime?
+  fetchedAt  DateTime  @default(now())
   /// اختفى من الحساب (حُذف/أُرشف)
-  gone        Boolean   @default(false)
+  gone       Boolean   @default(false)
 
   @@index([platform, postedAt])
 }
 
 /// حملات التمويل الإعلاني (Meta Marketing API) — لا تُنشأ إلا بموافقة الإدارة وضمن سقف الميزانية
 model AdBoost {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   postId      String
   platform    String
   dailyBudget Float
@@ -1321,7 +1324,7 @@ model AdBoost {
   /// تقدير ودليل المحلل قبل التمويل
   analysis    String?
   /// DRAFT | ACTIVE | PAUSED | DONE | FAILED
-  status      String    @default("DRAFT")
+  status      String   @default("DRAFT")
   campaignId  String?
   adSetId     String?
   adId        String?
@@ -1329,25 +1332,25 @@ model AdBoost {
   /// من استقطب الإعلان: {age:[{k,reach,clicks}], gender:[...], region:[...], spend, reach, clicks, at}
   audience    Json?
   createdById Int
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 /// إجراءات يقترحها المساعد الذكي — لا تُنفَّذ إلا بموافقة المستخدم وبصلاحياته (المالية والحساسة ممنوعة عليه)
 model AssistantAction {
-  id          Int       @id @default(autoincrement())
-  threadId    Int
-  messageId   Int?
-  userId      Int
-  tool        String
-  args        Json
+  id         Int       @id @default(autoincrement())
+  threadId   Int
+  messageId  Int?
+  userId     Int
+  tool       String
+  args       Json
   /// وصف الإجراء بالعربية كما سيُعرض للموافقة
-  summary     String
+  summary    String
   /// PROPOSED | EXECUTED | REJECTED | FAILED
-  status      String    @default("PROPOSED")
-  result      String?
-  executedAt  DateTime?
-  createdAt   DateTime  @default(now())
+  status     String    @default("PROPOSED")
+  result     String?
+  executedAt DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([threadId, status])
 }
@@ -1400,23 +1403,23 @@ model BoardVote {
 
 /// قسم الرواتب: كل من يتقاضى أجراً — عمال اليومية، الموظفون الشهريون، المهندسون والمدراء والمحاسبون والسائقون والحراس
 model Employee {
-  id             Int       @id @default(autoincrement())
+  id             Int             @id @default(autoincrement())
   name           String
   nationalId     String?
   phone          String?
   /// DAILY عامل مياومة (أجر يومي حسب الحضور) | MONTHLY راتب شهري ثابت
-  payType        String    @default("MONTHLY")
+  payType        String          @default("MONTHLY")
   /// WORKER | SKILLED | FOREMAN | ENGINEER | PM | ACCOUNTANT | ADMIN | DRIVER | OPERATOR | GUARD | OTHER
-  category       String    @default("WORKER")
+  category       String          @default("WORKER")
   jobTitle       String?
   dailyRate      Float?
   monthlySalary  Float?
   /// بدلات شهرية ثابتة (مواصلات، سكن، هاتف...)
-  allowances     Float     @default(0)
+  allowances     Float           @default(0)
   /// مشمول بالضمان الاجتماعي: يُقتطع 7.5% من الموظف وتدفع الشركة 14.25%
-  socialSecurity Boolean   @default(false)
+  socialSecurity Boolean         @default(false)
   /// CASH | BANK | CLIQ
-  payMethod      String    @default("CASH")
+  payMethod      String          @default("CASH")
   iban           String?
   /// المشروع الافتراضي (لتوزيع كلفة العمالة)
   tenderId       Int?
@@ -1424,10 +1427,10 @@ model Employee {
   userId         Int?
   startDate      DateTime?
   endDate        DateTime?
-  active         Boolean   @default(true)
+  active         Boolean         @default(true)
   notes          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   workDays       WorkDay[]
   adjustments    PayAdjustment[]
   lines          PayrollLine[]
@@ -1473,45 +1476,312 @@ model PayAdjustment {
 
 /// مسير رواتب شهري: يعدّه المحاسب ← يُرفع لمجلس الإدارة ← يُصرف
 model PayrollRun {
-  id           Int           @id @default(autoincrement())
+  id          Int           @id @default(autoincrement())
   /// YYYY-MM
-  period       String        @unique
+  period      String        @unique
   /// DRAFT مسودة | SUBMITTED أمام المجلس | APPROVED معتمد | PAID مصروف
-  status       String        @default("DRAFT")
-  gross        Float         @default(0)
-  net          Float         @default(0)
-  employerSS   Float         @default(0)
-  note         String?
-  createdById  Int
-  approvedAt   DateTime?
-  paidAt       DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  lines        PayrollLine[]
+  status      String        @default("DRAFT")
+  gross       Float         @default(0)
+  net         Float         @default(0)
+  employerSS  Float         @default(0)
+  note        String?
+  createdById Int
+  approvedAt  DateTime?
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  lines       PayrollLine[]
 }
 
 model PayrollLine {
-  id           Int        @id @default(autoincrement())
-  runId        Int
-  run          PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  employeeId   Int
-  employee     Employee   @relation(fields: [employeeId], references: [id])
-  payType      String
-  days         Float      @default(0)
-  rate         Float      @default(0)
-  base         Float      @default(0)
-  allowances   Float      @default(0)
-  overtime     Float      @default(0)
-  bonus        Float      @default(0)
-  advances     Float      @default(0)
-  deductions   Float      @default(0)
-  ssEmployee   Float      @default(0)
-  ssEmployer   Float      @default(0)
-  net          Float      @default(0)
-  payMethod    String     @default("CASH")
-  tenderId     Int?
-  paid         Boolean    @default(false)
-  paidAt       DateTime?
+  id         Int        @id @default(autoincrement())
+  runId      Int
+  run        PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId Int
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+  payType    String
+  days       Float      @default(0)
+  rate       Float      @default(0)
+  base       Float      @default(0)
+  allowances Float      @default(0)
+  overtime   Float      @default(0)
+  bonus      Float      @default(0)
+  advances   Float      @default(0)
+  deductions Float      @default(0)
+  ssEmployee Float      @default(0)
+  ssEmployer Float      @default(0)
+  net        Float      @default(0)
+  payMethod  String     @default("CASH")
+  tenderId   Int?
+  paid       Boolean    @default(false)
+  paidAt     DateTime?
 
   @@unique([runId, employeeId])
+}
+
+// ═════════════ السكن التشاركي «من العظم إلى المفتاح» ═════════════
+
+/// كتالوج المواد والأعمال — كل الأسعار تُعدَّل يدوياً من الإدارة (لا أسعار خارجية تلقائية)
+model CatalogItem {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  /// LAND_SKELETON | FACADE | MEP | PLASTER_FLOOR | PAINT_CEIL | DOORS_KITCHEN | FIXTURES_HANDOVER
+  phase       String
+  category    String
+  name        String
+  specs       String?
+  /// م² | م.ط | قطعة | مقطوعية | نقطة | طقم
+  unit        String
+  unitCost    Float    @default(0)
+  margin      Float    @default(0)
+  /// INCLUDED ضمن سعر العظم | REQUIRED إلزامي للتسليم | OPTION اختياري
+  mode        String   @default("OPTION")
+  /// خيارات متبادلة (يُختار واحد فقط من نفس المجموعة)
+  choiceGroup String?
+  /// الكمية الافتراضية = مساحة الشقة × المعامل (0 = كمية ثابتة defaultQty)
+  qtyPerSqm   Float    @default(0)
+  defaultQty  Float    @default(1)
+  /// يسمح للمشتري بتعديل الكمية (قطع، نقاط)
+  qtyEditable Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  /// يظهر في حاسبة الموقع العام
+  isPublic    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  updatedById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  selections CoBuildSelection[]
+
+  @@index([phase, sortOrder])
+}
+
+/// مشروع سكن تشاركي: عمارة بعدد شقق، تنطلق «تم» عند اكتمال حد الالتزام (مثلاً 7 من 8)
+model CoBuildProject {
+  id               Int       @id @default(autoincrement())
+  ref              String    @unique
+  name             String
+  tenderId         Int?
+  tender           Tender?   @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  location         String
+  parcel           String?
+  basin            String?
+  description      String?
+  totalUnits       Int       @default(8)
+  launchThreshold  Int       @default(7)
+  /// collecting_buyers | ready_to_launch | in_construction_skeleton | finishing | handover_completed | cancelled_reset
+  status           String    @default("collecting_buyers")
+  phaseLabel       String?
+  progress         Int       @default(0)
+  openedAt         DateTime  @default(now())
+  launchedAt       DateTime?
+  launchedById     Int?
+  /// حوافز الانتظار: من الشهر 6 (بعد 5 أشهر من التزام المشتري) — مبلغ لكل شهر حتى عدد أشهر أقصى
+  waitStartMonth   Int       @default(6)
+  waitPerMonth     Float     @default(500)
+  waitMaxMonths    Int       @default(3)
+  referrerBonus    Float     @default(700)
+  referredBonus    Float     @default(300)
+  /// سقف مجموع الحوافز للشقة الواحدة (حماية الهامش)
+  unitIncentiveCap Float     @default(2500)
+  earlyBirdCount   Int       @default(3)
+  earlyBirdBonus   Float     @default(0)
+  closerBonus      Float     @default(0)
+  neighborIntro    Boolean   @default(false)
+  isPublic         Boolean   @default(false)
+  createdById      Int
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  units      CoBuildUnit[]
+  buyers     CoBuildBuyer[]
+  milestones CoBuildMilestone[]
+  updates    CoBuildUpdate[]
+  tasks      CoBuildTask[]
+  events     CoBuildEvent[]
+  notices    CoBuildNotice[]
+}
+
+model CoBuildUnit {
+  id            Int            @id @default(autoincrement())
+  projectId     Int
+  project       CoBuildProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  unitCode      String
+  floor         String
+  areaSqm       Float
+  facadeView    String?
+  skeletonPrice Float
+  /// الشقة الاحتياطية (الثامنة) — خارج حد الالتزام وتباع لاحقاً
+  isBuffer      Boolean        @default(false)
+  /// available | reserved_cheque_held | locked_active | handed_over
+  status        String         @default("available")
+  sortOrder     Int            @default(0)
+
+  buyers CoBuildBuyer[]
+
+  @@unique([projectId, unitCode])
+}
+
+/// المشتري (الصفقة) + بيانات الشيك المصدق
+model CoBuildBuyer {
+  id               Int            @id @default(autoincrement())
+  projectId        Int
+  project          CoBuildProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  unitId           Int
+  unit             CoBuildUnit    @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  clientId         Int?
+  client           Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  name             String
+  phone            String?
+  email            String?
+  /// ACTIVE | WITHDRAWN | CONTRACTED | HANDED_OVER
+  status           String         @default("ACTIVE")
+  seq              Int
+  joinedAt         DateTime       @default(now())
+  withdrawnAt      DateTime?
+  contractedAt     DateTime?
+  earlyBird        Boolean        @default(false)
+  groupCloser      Boolean        @default(false)
+  referredById     Int?
+  referredBy       CoBuildBuyer?  @relation("Referral", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals        CoBuildBuyer[] @relation("Referral")
+  chequeNumber     String?
+  bankName         String?
+  chequeAmount     Float?
+  chequeIssuedAt   DateTime?
+  /// held_pending_go | released_on_go | returned_withdrawn | forfeited_or_settled
+  custodyStatus    String         @default("held_pending_go")
+  custodyChangedAt DateTime?
+  /// قفل الأسعار: بعده لا تتغير أسعار اختياراته مهما تغيّر الكتالوج
+  pricesLockedAt   DateTime?
+  remoteMode       Boolean        @default(false)
+  neighborOptIn    Boolean        @default(false)
+  neighborBio      String?
+  notes            String?
+  createdById      Int
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  selections CoBuildSelection[]
+  credits    CoBuildCredit[]
+  tasks      CoBuildTask[]
+
+  @@index([projectId, status])
+  @@index([clientId])
+}
+
+model CoBuildSelection {
+  id          Int          @id @default(autoincrement())
+  buyerId     Int
+  buyer       CoBuildBuyer @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  itemId      Int
+  item        CatalogItem  @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  qty         Float
+  /// السعر المقفول (null = يتبع سعر الكتالوج الحالي)
+  lockedPrice Float?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([buyerId, itemId])
+}
+
+/// الحوافز: WAITING (شهر 6–8) | REFERRER | REFERRED | EARLY_BIRD | CLOSER
+model CoBuildCredit {
+  id        Int          @id @default(autoincrement())
+  buyerId   Int
+  buyer     CoBuildBuyer @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  kind      String
+  /// مفتاح منع التكرار (مثلاً WAITING:6 أو REFERRER:<id>)
+  key       String
+  amount    Float
+  /// ACCRUED مستحق قبل «تم» | APPLIED طُبّق على الرصيد | FORFEITED سقط بالانسحاب
+  status    String       @default("ACCRUED")
+  note      String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([buyerId, key])
+}
+
+/// المراحل الزمنية («شو بكرا»)
+model CoBuildMilestone {
+  id          Int            @id @default(autoincrement())
+  projectId   Int
+  project     CoBuildProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  plannedDate DateTime?
+  doneAt      DateTime?
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+}
+
+/// سجل الموقع الأسبوعي (صور/فيديو) — مرفقاته Attachment entityType=cobuild_update
+model CoBuildUpdate {
+  id          Int            @id @default(autoincrement())
+  projectId   Int
+  project     CoBuildProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  createdById Int
+  createdBy   String
+  createdAt   DateTime       @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+/// «شو عندك»: دفعات، اختيارات، تواقيع، بنود تسليم — لمشترٍ واحد أو لكل مشتري المشروع (buyerId=null)
+model CoBuildTask {
+  id          Int            @id @default(autoincrement())
+  projectId   Int
+  project     CoBuildProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  buyerId     Int?
+  buyer       CoBuildBuyer?  @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  /// PAYMENT | SELECTION | SIGNOFF | HANDOVER
+  kind        String
+  title       String
+  details     String?
+  amount      Float?
+  dueDate     DateTime?
+  /// OPEN | DONE
+  status      String         @default("OPEN")
+  doneAt      DateTime?
+  /// موافقة رقمية من المشتري: الاسم والوقت والعنوان
+  signedName  String?
+  signedAt    DateTime?
+  signedIp    String?
+  remindedAt  DateTime?
+  createdById Int
+  createdAt   DateTime       @default(now())
+
+  @@index([projectId, status])
+}
+
+/// سجل أحداث المشروع (تدقيق الأعمال): التزام، شيك، انسحاب، «تم»، حوافز
+model CoBuildEvent {
+  id        Int            @id @default(autoincrement())
+  projectId Int
+  project   CoBuildProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  buyerId   Int?
+  action    String
+  note      String
+  actor     String
+  userId    Int?
+  clientId  Int?
+  createdAt DateTime       @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+/// إشعارات المشترين داخل البوابة (buyerId=null = لكل مشتري المشروع)
+model CoBuildNotice {
+  id        Int            @id @default(autoincrement())
+  projectId Int
+  project   CoBuildProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  buyerId   Int?
+  title     String
+  body      String
+  key       String?        @unique
+  createdAt DateTime       @default(now())
+
+  @@index([projectId, createdAt])
 }

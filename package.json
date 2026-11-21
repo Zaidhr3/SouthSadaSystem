@@ -24,7 +24,7 @@
     "files:import": "tsx scripts/import-legacy-files.ts",
     "db:backup": "node scripts/sync-db-provider.mjs && prisma generate && tsx scripts/backup-cloud.ts",
     "format": "prettier --write",
-    "test:unit": "tsx scripts/test-humanizer.ts && tsx scripts/test-fact-guard.ts && tsx scripts/test-security.ts",
+    "test:unit": "tsx scripts/test-humanizer.ts && tsx scripts/test-fact-guard.ts && tsx scripts/test-security.ts && tsx scripts/test-cobuild.ts",
     "db:assistant": "tsx scripts/setup-assistant-role.ts"
   },
   "prisma": {

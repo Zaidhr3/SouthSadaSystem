@@ -18,13 +18,16 @@ const MIME_BY_EXT: Record<string, string> = {
   ".dwg": "application/acad",
   ".zip": "application/zip",
   ".mp3": "audio/mpeg",
+  /** فيديو سجل الموقع الأسبوعي (السكن التشاركي) — يُشغَّل فقط ولا يُنفَّذ */
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
 };
 export function mimeFor(fileName: string) {
   return MIME_BY_EXT[path.extname(fileName).toLowerCase()] ?? "application/octet-stream";
 }
 
-/** ما يُعرض داخل المتصفح (inline): صور نقطية وPDF فقط — لا شيء يمكنه تنفيذ سكربت */
-const INLINE_SAFE = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
+/** ما يُعرض داخل المتصفح (inline): صور نقطية وPDF وفيديو فقط — لا شيء يمكنه تنفيذ سكربت */
+const INLINE_SAFE = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf", "video/mp4", "video/quicktime"]);
 
 /**
  * رؤوس الرد الآمنة لتقديم أي مرفق (للموظفين وبوابة العملاء):

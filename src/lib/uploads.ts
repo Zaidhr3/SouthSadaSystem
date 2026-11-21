@@ -10,7 +10,7 @@ import { consumeStaged, fetchStaged, stagedTokens, validStagedTickets, STAGED_MA
 /** على Vercel حد الطلب الواحد 4.5 ميغابايت؛ محلياً 20 ميغابايت */
 export const MAX_FILE_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB || 20);
 export const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
-const ALLOWED_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".doc", ".docx", ".xls", ".xlsx", ".dwg", ".zip", ".mp3"]);
+const ALLOWED_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".doc", ".docx", ".xls", ".xlsx", ".dwg", ".zip", ".mp3", ".mp4", ".mov"]);
 
 export { attachmentHeaders, mimeFor } from "./file-types";
 
@@ -46,7 +46,9 @@ export type EntityType =
   | "sign_request"
   /** مكتبة الوسائط التسويقية (صور المعدات والمشاريع) وهوية الحسابات (الصورة الشخصية والغلاف) */
   | "media_asset"
-  | "brand";
+  | "brand"
+  /** سجل الموقع الأسبوعي لمشروع سكن تشاركي (صور وفيديو يراها المشترون في البوابة) */
+  | "cobuild_update";
 
 /** يحدد العطاء/المشروع الذي يتبع له المرفق (لفحص صلاحية مدير المشروع) */
 export async function attachmentTenderId(entityType: string, entityId: number): Promise<number | null> {

@@ -12,6 +12,15 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   if (!client) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const att = await db.attachment.findUnique({ where: { id: Number(params.id) } });
   if (!att || !(CLIENT_VISIBLE as readonly string[]).includes(att.entityType)) return NextResponse.json({ error: "not found" }, { status: 404 });
+  // سجل الموقع للسكن التشاركي: مسموح فقط لمشترٍ في نفس المشروع (حتى لو انسحب لاحقاً لا يرى إلا ما نُشر لمشروعه)
+  if (att.entityType === "cobuild_update") {
+    const u = await db.coBuildUpdate.findUnique({ where: { id: att.entityId }, select: { projectId: true } });
+    const own = u && (await db.coBuildBuyer.findFirst({ where: { projectId: u.projectId, clientId: client.id, status: { not: "WITHDRAWN" } }, select: { id: true } }));
+    if (!own) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    const data = await readAttachmentData(att);
+    if (!data) return NextResponse.json({ error: "file missing" }, { status: 410 });
+    return new NextResponse(new Uint8Array(data), { headers: attachmentHeaders(att, { "Content-Length": String(data.length), "Cache-Control": "private, max-age=3600" }) });
+  }
   const tenderId =
     att.entityType === "diary"
       ? (await db.siteDiary.findUnique({ where: { id: att.entityId }, select: { tenderId: true } }))?.tenderId

@@ -19,7 +19,7 @@ const TICKET_TTL_MS = 15 * 60 * 1000;
 /** بعد انتهاء صلاحية الرفع يبقى الملف قابلاً للاستلام هذه المدة (نموذج طويل لم يُحفظ بعد) */
 const CLAIM_WINDOW_MS = 6 * 60 * 60 * 1000;
 
-const ALLOWED_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".doc", ".docx", ".xls", ".xlsx", ".dwg", ".zip"]);
+const ALLOWED_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".doc", ".docx", ".xls", ".xlsx", ".dwg", ".zip", ".mp4", ".mov"]);
 
 export const directUploadEnabled = () => process.env.NEXT_PUBLIC_DIRECT_UPLOAD === "1" && !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

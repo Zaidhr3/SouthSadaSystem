@@ -35,6 +35,7 @@ import {
   Share2,
   BadgeDollarSign,
   Wand2,
+  Building,
   type LucideIcon,
 } from "lucide-react";
 
@@ -63,6 +64,7 @@ export const NAV: NavGroup[] = [
     section: "العطاءات والتسعير",
     items: [
       { href: "/tenders", label: "العطاءات والمشاريع", pmLabel: "مشاريعي", icon: Briefcase, tint: "#60a5fa", keywords: "مشروع عطاء" },
+      { href: "/cobuild", label: "السكن التشاركي", icon: Building, tint: "#f59e0b", keywords: "عظم مفتاح شقق مشترين شيك مصدق تم كتالوج تشطيب حوافز جيب جارك cobuild" },
       { href: "/quotes", label: "طلبات التسعير من الموقع", icon: Inbox, tint: "#34d399", keywords: "عرض سعر rfq عملاء" },
       { href: "/pricing", label: "مكتبة الأسعار الذكية", icon: Library, tint: "#fbbf24", keywords: "أسعار جدول كميات boq مواصفات" },
       { href: "/variations", label: "أوامر التغيير", icon: GitPullRequestArrow, tint: "#c084fc" },

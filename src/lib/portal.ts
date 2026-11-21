@@ -5,7 +5,7 @@ import { AppError } from "./permissions";
 import { readAttachmentData, saveAttachments } from "./uploads";
 
 /** أنواع المرفقات التي يحق للعميل رؤيتها (ضمن مشروعه فقط) */
-export const CLIENT_VISIBLE = ["portal_message", "sign_request", "diary"] as const;
+export const CLIENT_VISIBLE = ["portal_message", "sign_request", "diary", "cobuild_update"] as const;
 
 export const SIGN_STATUS: Record<string, { label: string; tone: "orange" | "blue" | "green" | "red" }> = {
   PENDING_CLIENT: { label: "بانتظار توقيع العميل", tone: "orange" },
