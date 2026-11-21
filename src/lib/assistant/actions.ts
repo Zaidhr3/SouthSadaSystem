@@ -206,6 +206,54 @@ export const EXECUTORS: Record<string, { describe: (a: Record<string, unknown>) 
       return `اعتُمد وجُدول — يُنشر تلقائياً في موعده`;
     },
   },
+  generate_image: {
+    describe: (a) => `توليد صورة بالذكاء الاصطناعي: «${String(a.prompt).slice(0, 80)}» (${a.format === "STORY" ? "ستوري" : "منشور"})`,
+    validate: async (a) => {
+      if (String(a.prompt ?? "").trim().length < 2) throw new Error("وصف الصورة فارغ");
+    },
+    run: async (a, user) => {
+      const { analyzeStudio, INTENTS } = await import("../design/studio");
+      const { renderScene } = await import("../design/scene");
+      const { composeItem } = await import("../design/compose");
+      const plan = await analyzeStudio(String(a.prompt).slice(0, 600), a.format === "STORY" ? "STORY" : "POST");
+      const it = await db.marketingItem.create({ data: { kind: plan.format, source: "USER", category: INTENTS[plan.intent].category, title: plan.title, idea: plan.prompt, caption: plan.caption || plan.phrase || plan.title, storyText: plan.phrase || null, visualBrief: plan.concept, status: "IN_REVIEW", createdById: user.id } });
+      const r = await renderScene({ phrase: plan.phrase, concept: plan.concept, mood: plan.mood }, plan.format === "STORY" ? "9:16" : "4:5", user.id, { title: plan.phrase || plan.title });
+      await composeItem(it.id, { template: "scene", mediaIds: [r.assetId], headline: plan.phrase || plan.title, bakedText: r.baked }, user.id);
+      return `صُمّمت الصورة (${plan.intentLabel}${plan.phrase ? ` — «${plan.phrase}»` : ""}) وحُفظت كمنشور قيد المراجعة: /marketing/${it.id}`;
+    },
+  },
+  board_motion: {
+    describe: (a) => `رفع بند لمجلس الإدارة: ${String(a.title).slice(0, 80)}${a.amount ? ` (${a.amount} د.أ)` : ""}`,
+    validate: async (a) => {
+      if (!["PURCHASE", "TENDER", "GENERAL", "VARIATION"].includes(String(a.kind))) throw new Error("نوع البند غير صالح");
+      if (String(a.title ?? "").trim().length < 4 || String(a.details ?? "").trim().length < 10) throw new Error("العنوان أو التفاصيل ناقصة");
+      if (a.amount != null && !(Number(a.amount) >= 0)) throw new Error("قيمة غير صالحة");
+    },
+    run: async (a, user) => {
+      const { createMotion } = await import("../board/motions");
+      const m = await createMotion({ kind: String(a.kind), title: String(a.title).slice(0, 200), details: String(a.details).slice(0, 4000), amount: a.amount == null ? null : Number(a.amount) }, user);
+      return `رُفع البند ${m.ref} — بانتظار تدقيق المحاسب ثم تصويت المجلس: /board/${m.id}`;
+    },
+  },
+  roast: {
+    describe: (a) => `عرض قرار على غرفة النقد: ${String(a.decision).slice(0, 80)}`,
+    validate: async (a) => {
+      if (String(a.decision ?? "").trim().length < 15) throw new Error("اشرح القرار بجملة كاملة");
+    },
+    run: async (a) => {
+      const { runRoast } = await import("../board/roast");
+      const r = await runRoast(String(a.decision).slice(0, 2000));
+      const call = r.verdict.call === "GO" ? "امضِ" : r.verdict.call === "NO_GO" ? "لا تمضِ" : "امضِ بشروط";
+      const st = (x: string) => (x === "FOR" ? "مع" : x === "AGAINST" ? "ضد" : "بشروط");
+      return [
+        `حكم غرفة النقد: ${call} (ثقة ${r.verdict.confidence}%). ${r.verdict.summary}`,
+        `الشروط: ${r.verdict.conditions.join("؛ ") || "—"}`,
+        `متى نتراجع: ${r.verdict.killCriteria.join("؛ ")}`,
+        `الخطوات: ${r.verdict.nextSteps.join("؛ ")}`,
+        `المقاعد: ${r.seats.map((x) => `${x.pillar}: ${st(x.stance)}`).join("، ")}`,
+      ].join(" | ");
+    },
+  },
   resolve_issue: {
     describe: (a) => `تعليم المشكلة #${a.id} «${a.status === "DISMISSED" ? "ليست مشكلة" : "محلولة"}»`,
     validate: async (a) => {
@@ -228,13 +276,25 @@ export const EXECUTORS: Record<string, { describe: (a: Record<string, unknown>) 
   },
 };
 
-/** إنشاء اقتراح (لا تنفيذ) — يُستدعى من أدوات المساعد */
-export async function propose(tool: string, args: Record<string, unknown>, ctx: { threadId: number; userId: number }) {
+/** إجراءات تخرج للعامة (نشر على فيسبوك/إنستغرام) — تبقى بزر «نفّذ» حتى لو طُلبت مباشرة */
+const NEEDS_TAP = new Set(["schedule_post"]);
+
+/**
+ * إنشاء الإجراء — وللمدير العام يُنفَّذ فوراً (المساعد «يعمل» لا «يرد»):
+ * كل منفّذ يتحقق من صلاحياته وحدوده بنفسه (لا مالية، لا حذف، لا مستخدمين/أسرار)، والتنفيذ موثّق في سجل الإجراءات.
+ */
+export async function propose(tool: string, args: Record<string, unknown>, ctx: { threadId: number; userId: number }, user?: AppUser) {
   const ex = EXECUTORS[tool];
   if (!ex) throw new Error("إجراء غير معروف");
   await ex.validate(args);
   const a = await db.assistantAction.create({ data: { threadId: ctx.threadId, userId: ctx.userId, tool, args: args as Prisma.InputJsonValue, summary: ex.describe(args) } });
-  return { proposed: true, actionId: a.id, summary: a.summary, note: "اقتراح بانتظار موافقة المستخدم — لم يُنفَّذ بعد. لا تقل إنه تم." };
+  if (user && user.role === "ADMIN" && !user.actingFor && !NEEDS_TAP.has(tool)) {
+    const r = await executeAction(a.id, user);
+    return r.ok
+      ? { executed: true, actionId: a.id, summary: a.summary, result: r.result, note: "نُفّذ فعلاً — أخبر المستخدم بما تم ونتيجته (مع الرابط إن وُجد)." }
+      : { executed: false, failed: true, actionId: a.id, summary: a.summary, error: r.result, note: "فشل التنفيذ — اشرح السبب واقترح البديل." };
+  }
+  return { proposed: true, actionId: a.id, summary: a.summary, note: "بانتظار ضغط المستخدم على «نفّذ» — لم يُنفَّذ بعد. لا تقل إنه تم." };
 }
 
 /** تنفيذ اقتراح بعد الموافقة — بصلاحيات المستخدم (المدير العام فقط) */
@@ -259,9 +319,10 @@ export async function executeAction(id: number, user: AppUser) {
 }
 
 /** وصف القدرات للمساعد (يُضاف لموجّهه) */
-export const EDIT_GUIDE = `## التنفيذ (أنت منفّذ لا محلل فقط)
-عند طلب مهمة: افهمها، اجمع البيانات اللازمة بأدوات القراءة (الأرقام والمعرّفات الصحيحة)، ثم **استدعِ أدوات «propose_*» فوراً في نفس الرد** لكل خطوة — الاقتراح نفسه لا يغيّر شيئاً، بل يظهر للمستخدم بزر «نفّذ» وهذه هي خطوة الموافقة. لا تسأل «موافق أرفعها؟» قبل الاقتراح.
-بعد الاقتراح اكتب الخطة باختصار: «بدي أعمل كذا وكذا — إذا تمام اضغط نفّذ (أو نفّذ الكل)». لا تقل أبداً إن شيئاً تمّ قبل أن يصلك تأكيد التنفيذ.
-إن رُفض اقتراح لسبب (حقل محمي أو مالي) فاشرح ذلك واقترح البديل المسموح.
+export const EDIT_GUIDE = `## التنفيذ (أنت منفّذ لا محلل — «اعمل» لا «احكِ»)
+عند طلب مهمة: افهمها، اجمع البيانات اللازمة بأدوات القراءة (الأرقام والمعرّفات الصحيحة)، ثم **استدعِ أدوات «propose_*» فوراً في نفس الرد** لكل خطوة.
+للمدير العام: هذه الأدوات **تُنفَّذ فوراً** وتعيد لك النتيجة (executed: true) — فاعمل المهمة كاملة بخطواتها، ثم أخبر المستخدم باختصار بما تمّ فعلاً ونتيجته وروابطه. لا تطلب إذناً ولا تسأل «أعملها؟» ولا ترد بشرح بدل التنفيذ.
+إن عادت proposed: true (نشر عام، أو مستخدم غير المدير العام) فقل إنها جاهزة بزر «نفّذ». وإن عادت failed فاشرح السبب ونفّذ البديل المسموح.
+طلبات الصور («صمم/سوي صورة جمعة مباركة»، «تهنئة…») ← propose_generate_image مباشرة بوصف المستخدم كما هو. القرارات الكبيرة ← propose_roast، وما يحتاج موافقة جماعية ← propose_board_motion.
 الجداول المتاحة للتعديل/الإضافة: ${Object.entries(EDITABLE).map(([k, v]) => `${k} (${v.label}${v.create ? "، إضافة" : ""})`).join("؛ ")}.
 ممنوع عليك (اشرح للمستخدم أنها يدوية وأين يعدّلها): ${SENSITIVE_NOTE}`;

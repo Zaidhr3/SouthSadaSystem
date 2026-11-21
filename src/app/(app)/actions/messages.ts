@@ -62,6 +62,9 @@ export async function deleteMessage(id: number) {
   const result = await runVoid(async () => {
     const user = await actionUser();
     if (user.role !== "ADMIN") throw new AppError("حذف المراسلات للمدير العام فقط");
+    const { seatOf } = await import("@/lib/board/motions");
+    const chairExists = await db.user.count({ where: { boardSeat: "CHAIR", active: true } });
+    if (chairExists && (await seatOf(user.id)) !== "CHAIR") throw new AppError("حذف المراسلات لرئيس مجلس الإدارة فقط — المراسلات أدلة رقابية");
     const m = await db.message.findUnique({ where: { id }, include: { sender: { select: { name: true } }, recipient: { select: { name: true } } } });
     if (!m) throw new AppError("الرسالة غير موجودة");
     await db.message.delete({ where: { id } });

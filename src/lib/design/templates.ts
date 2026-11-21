@@ -6,7 +6,7 @@ import { BRAND as C, BRAND_CLASS, BRAND_EN, BRAND_NAME, BRAND_PHONE, LOGO_DATA_U
  * عناصر الهوية الثابتة: الشعار الأصلي، الإطار الهندسي (زوايا ذهبية + شبكة مخطط + خطوط أبعاد)، الكحلي/الذهبي/البرتقالي،
  * ورقم كتالوج «SJ·012» يجعل شبكة إنستغرام تبدو ككتالوج هندسي متسلسل.
  */
-export type TemplateId = "frame" | "split" | "blueprint" | "motif" | "stat" | "story" | "occasion" | "condolence";
+export type TemplateId = "frame" | "split" | "blueprint" | "motif" | "stat" | "story" | "occasion" | "condolence" | "scene";
 export const TEMPLATES: Record<TemplateId, { name: string; desc: string; photo: "required" | "optional" | "none" }> = {
   frame: { name: "إطار هندسي", desc: "صورة كاملة بإطار الزوايا الذهبية وشريط العنوان — للمشاريع والمعدات", photo: "required" },
   split: { name: "مقسوم", desc: "صورة في الأعلى ولوحة كحلية بالعنوان — للإنجازات ومن قلب الموقع", photo: "required" },
@@ -15,10 +15,11 @@ export const TEMPLATES: Record<TemplateId, { name: string; desc: string; photo: 
   stat: { name: "رقم بارز", desc: "رقم حقيقي من النص (مساحة، طوابق، أيام) بحجم كبير", photo: "optional" },
   story: { name: "قصة عمودية", desc: "1080×1920 بنص الشاشة الكبير", photo: "optional" },
   occasion: { name: "مناسبة وطنية/دينية", desc: "رصين بزخرفة ذهبية", photo: "none" },
+  scene: { name: "مشهد ذكاء اصطناعي", desc: "صورة سينمائية مولّدة تمثّل الشركة (رافعة تحمل العبارة، موقع عند الغروب...) — مختلفة كل مرة", photo: "required" },
   condolence: { name: "تعزية", desc: "أبيض وأسود رصين بلا ألوان تسويقية", photo: "none" },
 };
 
-export type SlideInput = { headline: string; sub?: string; label?: string; catalog?: string; photo?: string | null; stat?: { value: string; unit: string } | null; point?: { n: number; of: number } | null; cta?: string | null };
+export type SlideInput = { bakedText?: boolean; headline: string; sub?: string; label?: string; catalog?: string; photo?: string | null; stat?: { value: string; unit: string } | null; point?: { n: number; of: number } | null; cta?: string | null };
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
@@ -109,6 +110,13 @@ ${corners()}${logo()}
 <div style="position:absolute;right:80px;left:80px;bottom:300px">${label}
 <h1 data-fit="48" style="font-size:104px;margin-top:26px;max-height:620px;overflow:hidden">${esc(s.headline)}</h1>${s.sub ? `<p class="sub" style="font-size:40px;margin-top:22px">${esc(s.sub)}</p>` : ""}</div>
 <div style="position:absolute;left:80px;right:80px;bottom:150px;text-align:center"><span style="display:inline-block;background:#fff;color:${C.navy};font-weight:900;font-size:38px;padding:16px 46px;border-radius:999px">${esc(s.cta ?? `واتساب ${BRAND_PHONE}`)}</span></div>`);
+    case "scene":
+      return BASE(w, h, `
+<div class="photo" style="inset:0;background-image:url('${s.photo ?? ""}')"></div>
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,37,69,.35) 0%,rgba(11,37,69,0) 18%,rgba(11,37,69,0) ${s.bakedText ? 80 : 58}%,rgba(11,37,69,.9) 100%)"></div>
+${logo()}
+${s.bakedText ? "" : `<div style="position:absolute;right:76px;left:76px;bottom:150px"><h1 data-fit="40" style="font-size:78px;max-height:${Math.round(h * 0.24)}px;overflow:hidden;text-shadow:0 6px 30px rgba(0,0,0,.55)">${esc(s.headline)}</h1></div>`}
+<div class="dim" style="left:76px;right:76px;bottom:122px"></div>${foot(s)}`);
     case "occasion":
       return BASE(w, h, `
 <div style="position:absolute;inset:0;background:radial-gradient(60% 45% at 50% 40%,rgba(242,177,52,.25),transparent 70%),linear-gradient(180deg,${C.navy},#06182e)"></div>

@@ -33,6 +33,17 @@ export async function boardSeats() {
   return db.user.findMany({ where: { boardSeat: { not: null }, active: true }, select: { id: true, name: true, boardSeat: true, title: true, avatarId: true, bio: true }, orderBy: [{ boardSeat: "asc" }, { id: "asc" }] });
 }
 
+/**
+ * حوكمة الحسابات: حساب رئيس المجلس لا يُعدَّل (كلمة مرور، دور، إيقاف، تعطيل) إلا منه هو،
+ * وتغيير مقاعد المجلس لا يملكه إلا الرئيس — يمنع أي مدير آخر من الاستيلاء على الرئاسة أو إقفال حساب الرئيس.
+ */
+export async function assertBoardGovernance(actorId: number, targetId: number | null, opts: { seatChange?: boolean } = {}) {
+  const [actorSeat, chair] = await Promise.all([seatOf(actorId), db.user.findFirst({ where: { boardSeat: "CHAIR", active: true }, select: { id: true, name: true } })]);
+  if (!chair) return; // لا رئيس بعد — أول تعيين متاح للإدارة
+  if (targetId === chair.id && actorId !== chair.id) throw new AppError(`حساب رئيس مجلس الإدارة (${chair.name}) لا يعدّله إلا صاحبه`);
+  if (opts.seatChange && actorSeat !== "CHAIR") throw new AppError("تعيين أو تغيير مقاعد مجلس الإدارة لرئيس المجلس فقط");
+}
+
 export async function seatOf(userId: number) {
   return (await db.user.findUnique({ where: { id: userId }, select: { boardSeat: true } }))?.boardSeat ?? null;
 }
@@ -97,8 +108,8 @@ async function applyOutcome(m: { id: number; kind: string; refId: number | null;
 export async function closeMotion(motionId: number, outcome: "APPROVED" | "REJECTED", how: "VOTE" | "CHAIR_FAST", by: AppUser, reason?: string) {
   const m = await db.boardMotion.findUnique({ where: { id: motionId } });
   if (!m) throw new AppError("البند غير موجود");
-  if (!["AUDIT", "VOTING"].includes(m.status)) throw new AppError("تم البت في هذا البند مسبقاً");
-  await db.boardMotion.update({ where: { id: m.id }, data: { status: outcome, decidedBy: how, decidedById: by.id, decidedAt: new Date(), fastReason: how === "CHAIR_FAST" ? reason ?? null : null } });
+  const claimed = await db.boardMotion.updateMany({ where: { id: m.id, status: { in: ["AUDIT", "VOTING"] } }, data: { status: outcome, decidedBy: how, decidedById: by.id, decidedAt: new Date(), fastReason: how === "CHAIR_FAST" ? reason ?? null : null } });
+  if (!claimed.count) throw new AppError("تم البت في هذا البند مسبقاً");
   await applyOutcome(m, outcome === "APPROVED", by, reason ?? (how === "VOTE" ? "بالتصويت" : ""));
   const word = outcome === "APPROVED" ? "اعتُمد" : "رُفض";
   await notifyBoard(m.id, `${word} البند ${m.ref}: ${m.title}`, how === "CHAIR_FAST" ? `قرار فوري من رئيس المجلس — السبب: ${reason}` : "بأغلبية أصوات المجلس", by.id);

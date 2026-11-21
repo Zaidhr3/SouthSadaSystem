@@ -59,8 +59,10 @@ export async function generateFromIdea(_: ActionState, fd: FormData): Promise<Ac
     // التصميم التلقائي: المصمم الذكي يصمم كل عنصر (منشور 4:5 / ستوري 9:16) بنفسه — قابل للتعديل لاحقاً داخل النظام أو في Canva
     if (fd.get("autoDesign") !== "off") {
       const { smartCompose } = await import("@/lib/design/compose");
+      const { sceneCompose } = await import("@/lib/design/scene");
+      const brief = t(fd, "brief");
       const res = await Promise.race([
-        Promise.allSettled(items.map((it) => smartCompose(it.id, user.id))),
+        Promise.allSettled(items.map((it) => (brief ? sceneCompose(it.id, user.id, brief) : smartCompose(it.id, user.id)))),
         new Promise<null>((ok) => setTimeout(() => ok(null), 150_000)),
       ]);
       const made = res ? res.filter((x) => x.status === "fulfilled").length : 0;

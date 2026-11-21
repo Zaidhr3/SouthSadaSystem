@@ -16,7 +16,7 @@ import { CHECK_LABEL, detect, structuralFlags, VERDICT, type CheckName } from "@
 import { SKILLS } from "@/lib/content-skills/skills";
 import { SkillRunner } from "../skill-runner";
 import { CalendarClock, Fingerprint, MessagesSquare, Mic, Palette, Sparkles } from "lucide-react";
-import { composeAction, importCanva, pushToCanva, smartComposeAction } from "../../actions/design";
+import { composeAction, importCanva, pushToCanva, sceneComposeAction, smartComposeAction } from "../../actions/design";
 import { TEMPLATES, type TemplateId } from "@/lib/design/templates";
 import { canvaStatus, listDesigns } from "@/lib/canva";
 import { servicesStatus, voices as elVoices } from "@/lib/ai-services";
@@ -219,6 +219,15 @@ export default async function MarketingItemPage({ params }: { params: { id: stri
                   {slides.map((sl, i) => (
                     <a key={sl.id} href={`/api/files/${sl.id}`} target="_blank" className="shrink-0"><img src={`/api/files/${sl.id}`} alt={`شريحة ${i + 1}`} className={it.kind === "STORY" ? "h-48 rounded-xl border border-line" : "h-40 rounded-xl border border-line"} /></a>
                   ))}
+                </div>
+              )}
+              {it.category !== "CONDOLENCE" && (
+                <div className="mb-4 overflow-hidden rounded-2xl border border-gold/50 bg-gradient-to-l from-navy to-navy-3 p-4 text-white">
+                  <p className="mb-1 text-[15px] font-black text-gold">✦ مشهد ذكاء اصطناعي — صورة سينمائية جديدة كل مرة</p>
+                  <p className="mb-3 text-[13px] leading-6 text-white/75">مثل رافعة عند الغروب تحمل لوحة «جمعة مباركة»، أو حروف مضيئة على سقالة مبنى. العبارة تُدقق آلياً، وإن لم تكن مثالية تُكتب بخط الهوية فوق المشهد.</p>
+                  <ActionForm action={sceneComposeAction.bind(null, id)} submitLabel={slides.length ? "صمّم مشهداً جديداً" : "ولّد المشهد"} draft={false}>
+                    <textarea name="brief" rows={2} className="input !bg-white/90 !text-ink" placeholder="اوصف الصورة اللي بدك إياها بكلامك (اختياري) — مثلاً: رافعة شايلة لوحة مكتوب عليها «جمعة مباركة» وقت الغروب" />
+                  </ActionForm>
                 </div>
               )}
               <div className="mb-4 rounded-2xl border border-accent/25 bg-accent-soft/40 p-3">

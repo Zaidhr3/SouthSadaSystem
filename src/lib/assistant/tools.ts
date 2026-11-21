@@ -223,11 +223,11 @@ const parseJson = (v: unknown) => {
 };
 const P = (name: string, description: string, properties: ToolDef["parameters"]["properties"], required: string[], map: (a: Record<string, unknown>) => [string, Record<string, unknown>]): ToolDef & { run: Handler } => ({
   name,
-  description: `${description} (اقتراح بانتظار موافقة المستخدم)`,
+  description: `${description} (يُنفَّذ فوراً بصلاحياتك للمدير العام — عدا النشر العام الذي يحتاج زر «نفّذ»)`,
   parameters: { type: "object", properties, required },
   run: async (a, user, ctx) => {
     const [tool, args] = map(a);
-    return propose(tool, args, { threadId: ctx.threadId, userId: user.id });
+    return propose(tool, args, { threadId: ctx.threadId, userId: user.id }, user);
   },
 });
 TOOLS.push(
@@ -240,6 +240,9 @@ TOOLS.push(
   P("propose_design_post", "اقتراح تصميم ذكي لمنشور (صورة من المكتبة أو رسم هندسي)", { itemId: { type: "number" } }, ["itemId"], (a) => ["design_post", { itemId: Number(a.itemId) }]),
   P("propose_schedule_post", "اقتراح اعتماد منشور مصمم وجدولة نشره على فيسبوك وإنستغرام. publishAt بصيغة ISO", { itemId: { type: "number" }, publishAt: { type: "string" } }, ["itemId", "publishAt"], (a) => ["schedule_post", { itemId: Number(a.itemId), publishAt: String(a.publishAt) }]),
   P("propose_resolve_issue", "اقتراح إغلاق مشكلة في سجل المشاكل", { id: { type: "number" }, status: { type: "string", enum: ["RESOLVED", "DISMISSED"] } }, ["id"], (a) => ["resolve_issue", { id: Number(a.id), status: String(a.status ?? "RESOLVED") }]),
+  P("propose_generate_image", "توليد صورة تسويقية بالذكاء الاصطناعي من وصف المستخدم بكلامه (مثل: جمعة مباركة، تهنئة بعيد، رافعة تحمل عبارة...). يفهم النية ويبني المشهد ويولّد الصورة ويحفظها كمنشور قيد المراجعة", { prompt: { type: "string" }, format: { type: "string", enum: ["POST", "STORY"] } }, ["prompt"], (a) => ["generate_image", { prompt: String(a.prompt), format: String(a.format ?? "POST") }]),
+  P("propose_board_motion", "رفع بند لمجلس الإدارة (يذهب لتدقيق المحاسب ثم تصويت الأعضاء). kind: PURCHASE أو TENDER أو GENERAL أو VARIATION", { kind: { type: "string", enum: ["PURCHASE", "TENDER", "GENERAL", "VARIATION"] }, title: { type: "string" }, details: { type: "string" }, amount: { type: "number" } }, ["kind", "title", "details"], (a) => ["board_motion", { kind: String(a.kind), title: String(a.title), details: String(a.details), amount: a.amount == null ? null : Number(a.amount) }]),
+  P("propose_roast", "عرض قرار على غرفة النقد (7 مستشارين بالذكاء الاصطناعي) وإرجاع الحكم والمخاطر والخطوات", { decision: { type: "string" } }, ["decision"], (a) => ["roast", { decision: String(a.decision) }]),
   P("propose_refresh_accounts", "اقتراح تحديث وتحليل حسابات فيسبوك وإنستغرام", {}, [], () => ["refresh_accounts", {}]),
 );
 

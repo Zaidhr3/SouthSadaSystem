@@ -1,5 +1,7 @@
 "use server";
 
+import { assertBoardGovernance } from "@/lib/board/motions";
+
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -115,12 +117,14 @@ export async function saveUser(id: number | null, _: ActionState, fd: FormData):
     if (id === admin.id && data.role !== "ADMIN") throw new AppError("لا يمكنك إزالة صلاحية المدير العام عن نفسك");
     const exists = await db.user.findFirst({ where: { username: data.username, NOT: id ? { id } : undefined } });
     if (exists) throw new AppError("اسم المستخدم مستخدم مسبقاً");
+    const prevSeat = id ? (await db.user.findUnique({ where: { id }, select: { boardSeat: true } }))?.boardSeat ?? null : null;
+    await assertBoardGovernance(admin.id, id, { seatChange: (data.boardSeat ?? null) !== prevSeat });
     // رئيس مجلس الإدارة واحد فقط
     if (data.boardSeat === "CHAIR") {
       const other = await db.user.findFirst({ where: { boardSeat: "CHAIR", NOT: id ? { id } : undefined } });
       if (other) throw new AppError(`رئيس مجلس الإدارة الحالي هو ${other.name} — غيّر مقعده أولاً`);
     }
-    if (data.boardSeat && (data.role === "PM" || data.role === "AUDITOR" || data.role === "CHAIRMAN")) throw new AppError("عضوية المجلس (التصويت) تحتاج دور المدير العام أو المحاسب — أدوار الاطلاع لا تصوّت");
+    if (data.boardSeat && data.role !== "ADMIN") throw new AppError("عضوية المجلس (التصويت) لحسابات الإدارة (المدير العام) فقط — القرار المعتمد يُنفَّذ بصلاحياتها");
     const base = { name: data.name, username: data.username, role: data.role, title: data.title, phone: data.phone, email: data.email, notifyEmail: data.notifyEmail, boardSeat: data.boardSeat };
     if (id) {
       await db.user.update({ where: { id }, data: { ...base, ...(pwd ? { passwordHash: await bcrypt.hash(pwd, 10) } : {}) } });
@@ -137,6 +141,7 @@ export async function toggleUserActive(id: number) {
   const result = await runVoid(async () => {
     const admin = await actionUser(can.manageUsers);
     if (id === admin.id) throw new AppError("لا يمكنك تعطيل حسابك");
+    await assertBoardGovernance(admin.id, id);
     const u = await db.user.findUnique({ where: { id } });
     if (!u) throw new AppError("المستخدم غير موجود");
     await db.user.update({ where: { id }, data: u.active ? { active: false } : { active: true, suspendReason: null } });
@@ -150,6 +155,7 @@ export async function suspendUser(id: number, _: ActionState, fd: FormData): Pro
   return run(async () => {
     const admin = await actionUser(can.manageUsers);
     if (id === admin.id) throw new AppError("لا يمكنك إيقاف حسابك");
+    await assertBoardGovernance(admin.id, id);
     const reason = String(fd.get("reason") ?? "").trim().slice(0, 1000) || null;
     await db.user.update({ where: { id }, data: { active: false, suspendReason: reason } });
     refresh();

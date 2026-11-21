@@ -17,6 +17,7 @@ import { ActionForm, Input, Select, Textarea } from "@/components/forms";
 import { generateBrainstorm, generateEvent, generateFromIdea, generateWeek, runSkillAction } from "../actions/marketing";
 import { SKILLS } from "@/lib/content-skills/skills";
 import { SkillRunner } from "./skill-runner";
+import { StudioClient } from "./studio/studio-client";
 
 export const metadata = { title: "التسويق والعلاقات العامة" };
 export const maxDuration = 300;
@@ -53,6 +54,7 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
         title="التسويق والعلاقات العامة"
         actions={
           <>
+            <Link href="/marketing/studio" className="btn-primary"><Wand2 className="h-4 w-4" /> استوديو الصور الذكي</Link>
             <Link href="/marketing/grid" className="btn-secondary"><LayoutGrid className="h-4 w-4" /> شبكة إنستغرام</Link>
             <Link href="/marketing/media" className="btn-secondary"><Images className="h-4 w-4" /> مكتبة الوسائط</Link>
             <Link href="/marketing/brand" className="btn-secondary"><Palette className="h-4 w-4" /> هوية الحسابات</Link>
@@ -62,6 +64,19 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
         }
         subtitle={<>محتوى ذكي مبني على مشاريع الشركة الفعلية — الاستراتيجية: 1–2 منشور أسبوعياً و1–2 قصة يومياً. {ai ? <Badge tone="purple">الكاتب: {ai}</Badge> : <Badge tone="red">الذكاء الاصطناعي غير مُعد</Badge>} {meta?.configured ? (meta.ok ? <Badge tone="green">فيسبوك{meta.hasInstagram ? " + إنستغرام" : ""} مربوط{meta.pageName ? ` — ${meta.pageName}` : ""}</Badge> : <Badge tone="red">انقطع ربط فيسبوك — أعد الربط من الإعدادات</Badge>) : <Badge tone="gray">النشر التلقائي غير مربوط — نشر يدوي</Badge>}</>}
       />
+
+      {/* مربع الصور الذكي: اكتب ما تريد بكلامك ← يفهم النية ← خطة ← «ابدأ التنفيذ» ← الصورة */}
+      {manage && (
+        <section className="mb-6 overflow-hidden rounded-[28px] border border-gold/40 shadow-pop">
+          <div className="hero-exec relative px-5 py-4 text-white sm:px-7">
+            <p className="flex items-center gap-2 text-[19px] font-black"><Wand2 className="h-5 w-5 text-gold" /> اطلب صورتك بكلامك</p>
+            <p className="mt-1 text-[14px] text-white/75">اكتب بالضبط شو بدك — «جمعة مباركة»، «تهنئة بعيد الاستقلال فيها مبنى وعلم الأردن»، «رافعة شايلة لوحة نبني بثقة وقت الغروب» — والذكاء الاصطناعي يفهم ويصممها بهوية صدى الجنوب.</p>
+          </div>
+          <div className="bg-white/30 p-3 sm:p-5">
+            <StudioClient />
+          </div>
+        </section>
+      )}
       <Link href="/marketing/accounts" className="mb-5 block rounded-3xl bg-gradient-to-l from-navy via-navy-2 to-navy-3 p-5 text-white shadow-card transition hover:shadow-lg">
         <div className="flex flex-wrap items-center gap-4">
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10"><UserRoundSearch className="h-6 w-6 text-gold" /></span>
@@ -114,6 +129,7 @@ export default async function MarketingPage({ searchParams }: { searchParams: { 
               <Textarea name="idea" label="الفكرة بكلماتك" rows={3} required placeholder="مثال: صبّينا اليوم سقف فيلا عبدون والعمال اشتغلوا من الفجر" />
               <Select name="kind" label="الشكل" options={[{ value: "POST", label: "منشور (4:5 — 1080×1350)" }, { value: "STORY", label: "ستوري (9:16 — 1080×1920)" }, { value: "BOTH", label: "منشور + ستوري" }]} defaultValue="POST" />
               <Select name="autoDesign" label="التصميم" options={[{ value: "on", label: "صمّمه تلقائياً الآن (المصمم الذكي)" }, { value: "off", label: "النص فقط — أصمم لاحقاً" }]} defaultValue="on" hint="بعدها تقدر تعدّل العنوان والنص والقالب داخل النظام، أو تفتحه في Canva وتعدل عليه وترجعه" />
+              <Textarea name="brief" label="كيف بدك الصورة؟ (اختياري — بكلامك)" rows={2} placeholder="مثال: جرافة رافعة كفها وفيه لافتة مكتوب عليها «نبني بثقة»، والشمس طالعة ورا الجبال" />
             </ActionForm>
           </Card>
           <Card title={<span className="flex items-center gap-2"><Radar className="h-5 w-5 text-navy-3" /> رادار الأحداث</span>}>

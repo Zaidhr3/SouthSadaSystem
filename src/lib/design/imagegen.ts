@@ -15,7 +15,7 @@ const STYLES = {
 } as const;
 export type MotifStyle = keyof typeof STYLES;
 
-export async function generateImage(prompt: string, aspect: "1:1" | "4:5" | "16:9" = "1:1"): Promise<{ buf: Buffer; mime: string }> {
+export async function generateImage(prompt: string, aspect: "1:1" | "4:5" | "9:16" | "16:9" = "1:1"): Promise<{ buf: Buffer; mime: string }> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY غير مضبوط");
   let last = "";

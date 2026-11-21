@@ -39,7 +39,7 @@ export async function nextCatalogNo() {
   return n + 1;
 }
 
-export type ComposeOptions = { template?: TemplateId | "auto"; mediaIds: number[]; headline?: string; sub?: string; carousel?: boolean };
+export type ComposeOptions = { template?: TemplateId | "auto"; mediaIds: number[]; headline?: string; sub?: string; carousel?: boolean; bakedText?: boolean };
 
 export async function composeItem(itemId: number, opts: ComposeOptions, userId: number) {
   const it = await db.marketingItem.findUnique({ where: { id: itemId } });
@@ -72,7 +72,7 @@ export async function composeItem(itemId: number, opts: ComposeOptions, userId: 
   const pw = words(para).map((w) => w.replace(/^(ال|بال|وال|لل)/, ""));
   if (pw.length && pw.length <= 14 && pw.filter((w) => hw.has(w)).length / pw.length > 0.5) para = "";
   const sub = opts.sub !== undefined ? opts.sub.trim() || undefined : sensitive || isStory ? undefined : clip(para, 150) || undefined;
-  const base: SlideInput = { headline, sub, label: sensitive ? undefined : MKT_CATEGORY[it.category], catalog, photo: photos[0] ?? null, stat: template === "stat" ? pickStat(it.caption) : null, cta: it.cta || null };
+  const base: SlideInput = { bakedText: template === "scene" && !!opts.bakedText, headline, sub: template === "scene" ? undefined : sub, label: sensitive ? undefined : MKT_CATEGORY[it.category], catalog, photo: photos[0] ?? null, stat: template === "stat" ? pickStat(it.caption) : null, cta: it.cta || null };
 
   const pages: { html: string; w: number; h: number }[] = [];
   const size = isStory ? SIZES.story : SIZES.post;
@@ -119,6 +119,12 @@ export async function itemSlides(itemId: number) {
 export async function smartCompose(itemId: number, userId: number, opts: { style?: "line" | "render"; fresh?: boolean } = {}) {
   const it = await db.marketingItem.findUnique({ where: { id: itemId } });
   if (!it) throw new Error("العنصر غير موجود");
+  // المناسبات والتهاني (مثل جمعة مباركة): مشهد سينمائي مولّد يحمل العبارة — مختلف كل مرة
+  if (it.category === "OCCASION" || it.category === "CONGRATS" || it.category === "BRAND") {
+    const { sceneCompose } = await import("./scene");
+    const r = await sceneCompose(itemId, userId);
+    return { template: r.template, slides: r.slides, catalog: r.catalog, why: `مشهد مولّد: ${r.phrase || "بلا نص"}${r.baked ? " (العبارة داخل الصورة ومدققة آلياً)" : " (العبارة بخط الهوية فوق المشهد)"}`, motif: undefined as string | undefined };
+  }
   const { writeJson } = await import("../ai/writer");
   const { motifAsset } = await import("./imagegen");
   const [assets, recent] = await Promise.all([

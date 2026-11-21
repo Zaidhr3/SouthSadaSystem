@@ -17,6 +17,7 @@ import { LiveClock, ClockCard } from "./clock";
 import { EdgeSwipeBack, useSheetDrag } from "./ios-gestures";
 import { currentItem, isActive, navFor, type Role } from "./nav-config";
 import { Avatar } from "./profile-card";
+import { LiquidTabBar, type LiquidTab } from "./liquid-tabbar";
 
 const READ_ONLY: Role[] = ["CHAIRMAN", "AUDITOR"];
 type Counts = { unread: number; unreadMessages: number; board: number };
@@ -248,49 +249,15 @@ function MoreSheet({ open, onClose, role, bankVisible, counts, name, roleLabel, 
 
 /* ───────────── شريط التبويب السفلي (الهاتف) ───────────── */
 function TabBar({ role, counts, onMore }: { role: Role; counts: Counts; onMore: () => void }) {
-  const real = usePathname();
-  // تنقل متفائل: العدسة تنزلق فوراً عند اللمس قبل اكتمال تحميل الصفحة
-  const [tapped, setTapped] = useState<string | null>(null);
-  useEffect(() => setTapped(null), [real]);
-  const pathname = tapped ?? real;
   const canExpense = role === "ADMIN" || role === "ACCOUNTANT" || role === "PM";
-  const tabs: { href: string; label: string; icon: LucideIcon; badge?: number }[] = [
+  const tabs: LiquidTab[] = [
     { href: "/", label: "الرئيسية", icon: Home },
     { href: "/tenders", label: role === "PM" ? "مشاريعي" : "المشاريع", icon: Briefcase },
-    ...(canExpense ? [{ href: "/expenses/new", label: "مصروف", icon: Plus }] : [{ href: "/claims", label: "المطالبات", icon: Receipt }]),
+    canExpense ? { href: "/expenses/new", label: "مصروف", icon: Plus, primary: true } : { href: "/claims", label: "المطالبات", icon: Receipt },
     role === "PM" ? { href: "/messages", label: "الرسائل", icon: MessagesSquare, badge: counts.unreadMessages } : { href: "/board", label: "المجلس", icon: Gavel, badge: counts.board },
+    { label: "الأقسام", icon: LayoutGrid, onSelect: onMore, dot: counts.unreadMessages > 0 && role !== "PM" },
   ];
-  return (
-    <nav className="tabbar no-print lg:hidden" aria-label="التنقل السريع">
-      {(() => {
-        const idx = tabs.findIndex((t) => isActive(pathname, t.href));
-        if (idx < 0) return null;
-        const n = tabs.length + 1;
-        return <span aria-hidden className="tab-lens" style={{ width: `calc((100% - 12px) / ${n})`, transform: `translateX(calc(${-idx} * 100%))` }} />;
-      })()}
-      {tabs.map((t) => {
-        const active = isActive(pathname, t.href);
-        const Icon = t.icon;
-        const primary = t.href === "/expenses/new";
-        return (
-          <Link key={t.href} href={t.href} onClick={() => { haptic(); setTapped(t.href); }} className={clsx("tab", active && "tab-active", primary && "tab-primary")} aria-current={active ? "page" : undefined}>
-            <span className="relative">
-              <Icon className={primary ? "h-6 w-6" : "h-[23px] w-[23px]"} strokeWidth={active || primary ? 2.4 : 1.9} aria-hidden />
-              {!!t.badge && t.badge > 0 && <span className="num absolute -end-2.5 -top-1.5 min-w-[18px] rounded-full bg-bad px-1 text-center text-[10px] font-bold leading-[18px] text-white">{t.badge > 99 ? "99+" : t.badge}</span>}
-            </span>
-            <span>{t.label}</span>
-          </Link>
-        );
-      })}
-      <button type="button" onClick={() => { haptic(); onMore(); }} className="tab" aria-label="كل الأقسام">
-        <span className="relative">
-          <LayoutGrid className="h-[23px] w-[23px]" strokeWidth={1.9} aria-hidden />
-          {counts.unreadMessages > 0 && role !== "PM" && <span className="absolute -end-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-white" />}
-        </span>
-        <span>الأقسام</span>
-      </button>
-    </nav>
-  );
+  return <LiquidTabBar tabs={tabs} />;
 }
 
 export function AppShell({

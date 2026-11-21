@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { animateSpring, SPRING_SHEET, SPRING_SOFT, velocityTracker } from "./spring";
 /** اهتزاز خفيف (حيث يدعمه الجهاز) — محلي لتجنب الاستيراد الدائري مع forms */
 function haptic(ms = 8) {
   try {
@@ -41,6 +42,8 @@ export function EdgeSwipeBack({ targetId = "app-main" }: { targetId?: string }) 
 
     const onStart = (e: TouchEvent) => {
       if (e.touches.length !== 1 || path.current === "/" || document.querySelector("[aria-modal='true']")) return;
+      // السحب على أشرطة التبويب الزجاجية له إيماءته الخاصة (العدسة) — لا رجوع من الحافة
+      if ((e.target as HTMLElement | null)?.closest?.(".liquid-tabbar, .liquid-seg, [data-scrub-item]")) return;
       const t = e.touches[0];
       const w = window.innerWidth;
       const side = t.clientX > w - EDGE ? 1 : t.clientX < EDGE ? -1 : 0;
@@ -121,43 +124,66 @@ export function useSheetDrag(onClose: () => void, enabled = true) {
     p.style.transform = "";
     p.style.transition = "";
     if (!window.matchMedia("(max-width: 639px)").matches) return;
-    let y0 = 0, t0 = 0, dy = 0, dragging = false, armed = false;
+    /**
+     * سحب الورقة من أعلاها للأسفل (بنمط iOS):
+     *  - تتبع الإصبع 1:1 للأسفل، ومقاومة مطاطية للأعلى (لا تُرفع فوق مكانها)
+     *  - الإفلات بعد عتبة المسافة (25% من الارتفاع، 110px على الأقل) أو بسحبة سريعة فعلية (≥ 900px/ث لآخر 90ms وبعد 50px)
+     *    ← تنزلق للأسفل بنابض يرث سرعة الإصبع ثم تُغلق؛ وإلا ← تعود لمكانها بنابض ناعم. لا إغلاق تلقائي أبداً بلا سحب.
+     */
+    const vt = velocityTracker();
+    let y0 = 0, dy = 0, dragging = false, armed = false;
+    let stop: (() => void) | null = null;
+    let current = 0;
+    const bd = () => p.parentElement?.querySelector<HTMLElement>(".modal-backdrop") ?? null;
+    const set = (y: number) => {
+      current = y;
+      p.style.transform = y ? `translate3d(0,${y}px,0)` : "";
+      const b = bd();
+      if (b) b.style.opacity = String(Math.max(0, 1 - Math.max(0, y) / (p.offsetHeight || 600)));
+    };
     const fromHandle = (target: EventTarget | null) => !!(target as HTMLElement | null)?.closest?.("[data-sheet-handle]");
     const onStart = (e: TouchEvent) => {
       const sc = scroller.current;
-      armed = fromHandle(e.target) || !sc || sc.scrollTop <= 0;
-      if ((e.target as HTMLElement).closest?.("input, textarea, select, [contenteditable]")) armed = fromHandle(e.target);
-      y0 = e.touches[0].clientY; t0 = Date.now(); dy = 0; dragging = false;
+      const handle = fromHandle(e.target);
+      armed = handle || !sc || sc.scrollTop <= 0;
+      if (!handle && (e.target as HTMLElement).closest?.("input, textarea, select, [contenteditable], .overflow-x-auto, [data-scrub-item]")) armed = false;
+      if (!armed) return;
+      stop?.();
+      stop = null;
+      y0 = e.touches[0].clientY - current; // يكمل من الموضع الحالي إن أُمسكت أثناء حركة
+      dy = current;
+      dragging = current !== 0;
+      vt.reset();
+      vt.push(e.touches[0].clientY);
     };
     const onMove = (e: TouchEvent) => {
       if (!armed) return;
-      dy = e.touches[0].clientY - y0;
+      const y = e.touches[0].clientY;
+      dy = y - y0;
       if (!dragging) {
         if (dy < 6) { if (dy < -4) armed = false; return; }
         dragging = true;
         p.style.transition = "none";
+        p.style.animation = "none";
       }
       e.preventDefault();
-      const d = dy < 0 ? dy * 0.2 : dy;
-      p.style.transform = `translate3d(0,${d}px,0)`;
-      const bd = p.parentElement?.querySelector<HTMLElement>(".modal-backdrop");
-      if (bd) bd.style.opacity = String(Math.max(0.15, 1 - dy / 500));
+      vt.push(y);
+      // للأسفل 1:1، وللأعلى مقاومة مطاطية متناقصة
+      set(dy >= 0 ? dy : -Math.sqrt(-dy) * 2.2);
     };
     const onEnd = () => {
       if (!dragging) return;
       dragging = false;
-      const v = dy / Math.max(1, Date.now() - t0);
-      const bd = p.parentElement?.querySelector<HTMLElement>(".modal-backdrop");
-      if (dy > 120 || (v > 0.6 && dy > 30)) {
+      armed = false;
+      const v = vt.get();
+      const h = p.offsetHeight || 600;
+      const far = current > Math.max(110, h * 0.25);
+      const flick = v > 900 && current > 50;
+      if ((far || flick) && v > -300) {
         haptic(8);
-        p.style.transition = "transform .24s ease-in";
-        p.style.transform = "translate3d(0,100%,0)";
-        if (bd) { bd.style.transition = "opacity .24s"; bd.style.opacity = "0"; }
-        setTimeout(() => cb.current(), 200);
+        stop = animateSpring({ from: current, to: h + 40, velocity: Math.max(v, 1200), ...SPRING_SHEET, clamp: true, onUpdate: set, onDone: () => cb.current() });
       } else {
-        p.style.transition = "transform .45s var(--spring-soft)";
-        p.style.transform = "";
-        if (bd) { bd.style.transition = "opacity .3s"; bd.style.opacity = ""; }
+        stop = animateSpring({ from: current, to: 0, velocity: v, ...SPRING_SOFT, onUpdate: set, onDone: () => { set(0); const b = bd(); if (b) b.style.opacity = ""; } });
       }
     };
     p.addEventListener("touchstart", onStart, { passive: true });
@@ -165,6 +191,7 @@ export function useSheetDrag(onClose: () => void, enabled = true) {
     p.addEventListener("touchend", onEnd, { passive: true });
     p.addEventListener("touchcancel", onEnd, { passive: true });
     return () => {
+      stop?.();
       p.removeEventListener("touchstart", onStart);
       p.removeEventListener("touchmove", onMove);
       p.removeEventListener("touchend", onEnd);

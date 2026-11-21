@@ -21,7 +21,7 @@ const done = (id?: number) => {
 export async function submitMotion(_: ActionState, fd: FormData): Promise<ActionState> {
   let id = 0;
   const r = await run(async () => {
-    const user = await actionUser();
+    const user = await actionUser((r) => r === "ADMIN" || r === "ACCOUNTANT");
     const kind = t(fd, "kind");
     if (!(kind in MOTION_KIND)) throw new AppError("اختر نوع البند");
     const title = t(fd, "title");

@@ -243,3 +243,22 @@ export async function pushToCanva(itemId: number, _: ActionState, __: FormData):
   revalidatePath(`/marketing/${itemId}`);
   return r;
 }
+
+/** «مشهد ذكاء اصطناعي»: صورة سينمائية جديدة تمثّل الشركة وتحمل عبارة المنشور — مختلفة في كل ضغطة */
+export async function sceneComposeAction(itemId: number, _: ActionState, fd: FormData): Promise<ActionState> {
+  const r = await run(async () => {
+    const user = await actionUser(can.manageMarketing);
+    const it = await db.marketingItem.findUnique({ where: { id: itemId }, select: { status: true } });
+    if (!it || it.status === "PUBLISHED") throw new AppError("لا يمكن تعديل تصميم عنصر منشور");
+    try {
+      const { sceneCompose } = await import("@/lib/design/scene");
+      const res = await sceneCompose(itemId, user.id, String(fd.get("brief") ?? ""));
+      return `مشهد جديد${res.phrase ? ` «${res.phrase}»` : ""} — ${res.baked ? "العبارة داخل الصورة ومدققة آلياً" : "العبارة بخط الهوية فوق المشهد"}`;
+    } catch (e) {
+      throw new AppError(`تعذر توليد المشهد: ${e instanceof Error ? e.message : e}`);
+    }
+  });
+  revalidatePath(`/marketing/${itemId}`);
+  revalidatePath("/marketing/grid");
+  return r;
+}

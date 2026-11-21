@@ -18,6 +18,7 @@ const QUICK: { label: string; href: string; roles?: Role[]; keys: string }[] = [
   { label: "بند جديد لمجلس الإدارة", href: "/board", roles: ["ADMIN", "ACCOUNTANT"], keys: "مجلس تصويت قرار" },
   { label: "غرفة النقد — اعرض قراراً على 7 مستشارين", href: "/board?tab=roast", roles: ["ADMIN", "ACCOUNTANT"], keys: "roast نقد مستشار" },
   { label: "منشور أو ستوري جديد", href: "/marketing", roles: ["ADMIN"], keys: "تسويق تصميم canva" },
+  { label: "صورة بالذكاء الاصطناعي (جمعة مباركة، تهنئة…)", href: "/marketing/studio", roles: ["ADMIN"], keys: "استوديو صورة تهنئة جمعة" },
 ];
 
 /** لوحة الأوامر (Ctrl/⌘ + K): انتقال فوري لأي قسم، إجراءات سريعة، وسؤال المساعد الذكي */
@@ -64,7 +65,7 @@ export function CommandPalette({ role, bankVisible, canAsk }: { role: Role; bank
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-start justify-center px-3 pt-[10vh]" role="dialog" aria-modal="true" aria-label="البحث السريع">
       <div className="absolute inset-0 animate-fade-in bg-navy/50 backdrop-blur-sm" onClick={close} />
-      <div className="relative w-full max-w-xl animate-pop-in overflow-hidden rounded-[22px] border border-white/40 bg-white/95 shadow-pop backdrop-blur-xl">
+      <div className="lg-chrome relative w-full max-w-xl animate-pop-in overflow-hidden rounded-[22px] shadow-pop">
         <div className="flex items-center gap-3 border-b border-line px-4">
           <Search className="h-5 w-5 shrink-0 text-accent" />
           <input

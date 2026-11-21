@@ -64,7 +64,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: { ta
     db.employee.findMany({ where: user.role === "PM" ? { payType: "DAILY", active: true } : {}, orderBy: [{ active: "desc" }, { payType: "asc" }, { name: "asc" }] }),
     db.tender.findMany({ where: { status: { in: ["WON", "EXECUTION", "MAINTENANCE", "PRICING", "SUBMITTED"] }, ...pmTenders }, select: { id: true, name: true, number: true }, orderBy: { id: "desc" } }),
     manage ? db.user.findMany({ where: { active: true }, select: { id: true, name: true } }) : Promise.resolve([]),
-    db.workDay.findMany({ where: { date: { gte: from, lt: to }, ...(user.role === "PM" ? { OR: [{ tenderId: { in: (await db.tender.findMany({ where: { managerId: user.id }, select: { id: true } })).map((x) => x.id) } }, { recordedById: user.id }] } : {}) }, include: { employee: { select: { name: true, dailyRate: true } } }, orderBy: [{ date: "desc" }] }),
+    db.workDay.findMany({ where: { date: { gte: from, lt: to }, ...(user.role === "PM" ? { OR: [{ tenderId: { in: (await db.tender.findMany({ where: { managerId: user.id }, select: { id: true } })).map((x) => x.id) } }, { recordedById: user.id }] } : {}) }, include: { employee: { select: { name: true, dailyRate: viewAll } } }, orderBy: [{ date: "desc" }] }),
     viewAll ? db.payAdjustment.findMany({ where: { period: month }, include: { employee: { select: { name: true } } }, orderBy: { id: "desc" } }) : Promise.resolve([]),
     viewAll ? db.payrollRun.findMany({ orderBy: { period: "desc" }, take: 24, include: { _count: { select: { lines: true } } } }) : Promise.resolve([]),
   ]);
@@ -163,7 +163,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: { ta
                   <div className="grid max-h-64 gap-1.5 overflow-y-auto rounded-2xl bg-white/40 p-2">
                     {daily.map((w) => (
                       <label key={w.id} className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-semibold hover:bg-white/60">
-                        <input type="checkbox" name="employeeIds" value={w.id} /> {w.name} <span className="ms-auto text-xs text-ink-muted">{w.dailyRate} د.أ</span>
+                        <input type="checkbox" name="employeeIds" value={w.id} /> {w.name} {viewAll && <span className="ms-auto text-xs text-ink-muted">{w.dailyRate} د.أ</span>}
                       </label>
                     ))}
                   </div>
@@ -176,7 +176,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: { ta
             {monthDays.length === 0 ? <p className="px-6 py-10 text-center text-sm text-ink-muted">لا يوميات مسجلة لهذا الشهر</p> : (
               <div className="overflow-x-auto">
                 <table className="tbl">
-                  <thead><tr><th>التاريخ</th><th>العامل</th><th>الحضور</th><th>إضافي</th><th>المشروع</th><th className="text-end">الأجر</th><th /></tr></thead>
+                  <thead><tr><th>التاريخ</th><th>العامل</th><th>الحضور</th><th>إضافي</th><th>المشروع</th>{viewAll && <th className="text-end">الأجر</th>}<th /></tr></thead>
                   <tbody>
                     {monthDays.map((w) => (
                       <tr key={w.id}>
@@ -185,7 +185,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: { ta
                         <td>{w.days === 1 ? "يوم" : w.days === 0.5 ? "نصف يوم" : `${w.days} يوم`}</td>
                         <td className="num">{w.overtimeHours ? `${w.overtimeHours} س` : "—"}</td>
                         <td className="text-ink-soft">{w.tenderId ? tenderName.get(w.tenderId) ?? "—" : "إدارة عامة"}</td>
-                        <td className="text-end"><Money value={w.days * (w.employee.dailyRate ?? 0)} /></td>
+                        {viewAll && <td className="text-end"><Money value={w.days * (w.employee.dailyRate ?? 0)} /></td>}
                         <td><ConfirmButton action={deleteWorkDay.bind(null, w.id)} confirm="حذف هذه اليومية؟" className="btn-danger btn-sm" title="حذف"><Trash2 className="h-4 w-4" /></ConfirmButton></td>
                       </tr>
                     ))}

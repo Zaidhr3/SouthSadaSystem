@@ -23,6 +23,10 @@ export async function uploadProfileImage(slot: Slot, _: ActionState, fd: FormDat
     await saveAttachments(fd, "user_profile", user.id, user.id, "files", { slot, label: LABEL[slot] });
     const att = await db.attachment.findFirst({ where: { entityType: "user_profile", entityId: user.id, slot }, orderBy: { id: "desc" } });
     if (!att) throw new AppError("تعذر حفظ الصورة");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(att.mimeType)) {
+      await db.attachment.delete({ where: { id: att.id } });
+      throw new AppError("الصورة يجب أن تكون JPG أو PNG أو WEBP");
+    }
     const prev = (await db.user.findUnique({ where: { id: user.id }, select: { [FIELD[slot]]: true } })) as Record<string, number | null> | null;
     await db.user.update({ where: { id: user.id }, data: { [FIELD[slot]]: att.id, ...(slot === "cover" ? { coverPreset: null } : slot === "wallpaper" ? { wallpaperPreset: null } : {}) } });
     const old = prev?.[FIELD[slot]];

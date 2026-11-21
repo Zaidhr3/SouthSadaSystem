@@ -223,8 +223,9 @@ export async function payRun(id: number, _: ActionState, fd: FormData): Promise<
     const lines = await db.payrollLine.findMany({ where: { runId: id } });
     const tt = totals(lines);
     await db.$transaction(async (tx) => {
+      const claimed = await tx.payrollRun.updateMany({ where: { id, status: "APPROVED" }, data: { status: "PAID", paidAt: date } });
+      if (!claimed.count) throw new AppError("صُرف هذا المسير مسبقاً");
       await tx.payrollLine.updateMany({ where: { runId: id }, data: { paid: true, paidAt: date } });
-      await tx.payrollRun.update({ where: { id }, data: { status: "PAID", paidAt: date } });
       await upsertLinkedBankTx(tx, "PAYROLL", id, { date, type: "OUT", amount: tt.bank + (fd.get("ssFromBank") === "on" ? tt.employerSS + lines.reduce((s, l) => s + l.ssEmployee, 0) : 0), description: `رواتب ${periodLabel(rr.period)} — تحويلات${fd.get("ssFromBank") === "on" ? " + اشتراكات الضمان" : ""}` });
     });
     await auditEvent("PAY", "PayrollRun", `صرف مسير ${rr.period}: صافي ${tt.net} د.أ`, user, { recordId: id });

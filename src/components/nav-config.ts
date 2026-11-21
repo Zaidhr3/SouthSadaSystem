@@ -34,6 +34,7 @@ import {
   Gavel,
   Share2,
   BadgeDollarSign,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -102,6 +103,7 @@ export const NAV: NavGroup[] = [
     id: "market",
     section: "التسويق والعلاقات العامة",
     items: [
+      { href: "/marketing/studio", label: "استوديو الصور الذكي", icon: Wand2, roles: MGMT, tint: "#fbbf24", keywords: "صورة تصميم جمعة مباركة تهنئة ذكاء اصطناعي" },
       { href: "/marketing", label: "استوديو التسويق", icon: Megaphone, roles: MGMT, tint: "#f472b6", keywords: "منشور ستوري تصميم canva" },
       { href: "/marketing/accounts", label: "حساباتي والإعلانات", icon: Share2, roles: MGMT, tint: "#60a5fa", keywords: "فيسبوك انستغرام ممول جمهور" },
     ],
@@ -128,7 +130,7 @@ export function navFor(role: Role, bankVisible?: boolean): NavGroup[] {
 
 export function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
-  if (href === "/marketing") return pathname === "/marketing" || (pathname.startsWith("/marketing/") && !pathname.startsWith("/marketing/accounts"));
+  if (href === "/marketing") return pathname === "/marketing" || (pathname.startsWith("/marketing/") && !pathname.startsWith("/marketing/accounts") && !pathname.startsWith("/marketing/studio"));
   return pathname === href || pathname.startsWith(href + "/");
 }
 
